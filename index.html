@@ -12,27 +12,29 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: radial-gradient(1200px 800px at 20% 0%, #121416 0%, #0b0c0e 40%, #08090b 100%);
             min-height: 100vh;
-            color: #fff;
-            padding: 20px;
+            color: #e6e6e6;
+            padding: 16px;
+            letter-spacing: 0.2px;
         }
 
         .wrapper {
-            max-width: 1400px;
+            max-width: 1280px;
             margin: 0 auto;
         }
 
         header {
             text-align: center;
-            margin-bottom: 25px;
+            margin-bottom: 18px;
         }
 
         h1 {
-            font-size: 2.2em;
-            margin-bottom: 5px;
-            color: #fff;
+            font-size: 2.0em;
+            margin-bottom: 4px;
+            color: #f5f5f5;
+            letter-spacing: 0.3px;
         }
 
         h1 .gradient-text {
@@ -42,15 +44,15 @@
         }
 
         .subtitle {
-            color: #aaa;
-            font-size: 0.9em;
+            color: #9aa0a6;
+            font-size: 0.85em;
         }
 
         .main-grid {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
+            gap: 14px;
+            margin-bottom: 14px;
         }
 
         @media (min-width: 1400px) {
@@ -115,12 +117,12 @@
         }
 
         .card {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            padding: 20px;
+            background: rgba(14, 16, 19, 0.92);
+            border-radius: 14px;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+            padding: 16px;
         }
 
         @media (min-width: 1400px) {
@@ -130,20 +132,22 @@
         }
 
         .card h2 {
-            font-size: 1.3em;
-            margin-bottom: 15px;
-            color: #4CAF50;
+            font-size: 1.05em;
+            margin-bottom: 10px;
+            color: #7ddc8c;
+            letter-spacing: 0.3px;
         }
 
         .form-group {
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         label {
             display: block;
             margin-bottom: 4px;
             font-weight: 500;
-            font-size: 0.85em;
+            font-size: 0.78em;
+            color: #cfd3d7;
         }
 
         @media (min-width: 1400px) {
@@ -160,7 +164,7 @@
         .location-selector {
             display: flex;
             gap: 8px;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         @media (min-width: 1400px) {
@@ -171,21 +175,21 @@
 
         .location-btn {
             flex: 1;
-            padding: 12px 20px;
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            background: rgba(255, 255, 255, 0.05);
-            color: #fff;
-            border-radius: 10px;
+            padding: 10px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.04);
+            color: #e6e6e6;
+            border-radius: 9px;
             cursor: pointer;
-            font-size: 1em;
+            font-size: 0.95em;
             font-weight: 600;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
         }
 
         .location-btn.active {
-            background: #4CAF50;
-            border-color: #4CAF50;
-            box-shadow: 0 0 20px rgba(76, 175, 80, 0.4);
+            background: linear-gradient(135deg, #5fd068, #3bbf5a);
+            border-color: rgba(95, 208, 104, 0.7);
+            box-shadow: 0 0 16px rgba(95, 208, 104, 0.35);
         }
 
         .location-btn:hover:not(.active) {
@@ -195,13 +199,13 @@
 
         input[type="number"] {
             width: 100%;
-            padding: 10px 12px;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 9px 10px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.14);
             border-radius: 8px;
-            color: #fff;
-            font-size: 0.95em;
-            transition: all 0.3s ease;
+            color: #f2f2f2;
+            font-size: 0.9em;
+            transition: all 0.2s ease;
         }
 
         @media (min-width: 1400px) {
@@ -213,23 +217,23 @@
 
         input[type="number"]:focus {
             outline: none;
-            background: rgba(255, 255, 255, 0.12);
-            border-color: #4CAF50;
-            box-shadow: 0 0 10px rgba(76, 175, 80, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(95, 208, 104, 0.9);
+            box-shadow: 0 0 10px rgba(95, 208, 104, 0.2);
         }
 
         button {
             width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #4CAF50, #45a049);
-            color: white;
+            padding: 10px;
+            background: linear-gradient(135deg, #5fd068, #3bbf5a);
+            color: #0b120c;
             border: none;
             border-radius: 8px;
-            font-size: 1em;
+            font-size: 0.95em;
             font-weight: 700;
             cursor: pointer;
-            transition: all 0.3s ease;
-            margin-top: 8px;
+            transition: all 0.2s ease;
+            margin-top: 6px;
         }
 
         @media (min-width: 1400px) {
@@ -503,7 +507,7 @@
 <body>
     <div class="wrapper">
         <header>
-            <h1>🏀 <span class="gradient-text">Celtics AI</span></h1>
+            <h1>🏀 <span class="gradient-text">Celtic AI</span></h1>
             <p class="subtitle">Win Prediction Model</p>
         </header>
 
@@ -538,48 +542,28 @@
                 <form id="predictionForm">
                     <div class="form-grid">
                         <div class="form-group">
-                            <label for="fg_pct">Field Goal % (FG%)</label>
-                            <input type="number" id="fg_pct" name="fg_pct" step="0.01" min="0" max="1" placeholder="0.45" required>
+                            <label for="pace">Pace</label>
+                            <input type="number" id="pace" name="pace" step="0.1" min="0" placeholder="98.5" required>
                         </div>
 
                         <div class="form-group">
-                            <label for="fg3_pct">3-Point % (FG3%)</label>
-                            <input type="number" id="fg3_pct" name="fg3_pct" step="0.01" min="0" max="1" placeholder="0.35" required>
+                            <label for="ftr">Free Throw Rate (FTr)</label>
+                            <input type="number" id="ftr" name="ftr" step="0.001" min="0" max="1" placeholder="0.22" required>
                         </div>
 
                         <div class="form-group">
-                            <label for="fta">Free Throw Attempts (FTA)</label>
-                            <input type="number" id="fta" name="fta" step="0.1" min="0" placeholder="20" required>
+                            <label for="efg_pct">Effective FG% (eFG%)</label>
+                            <input type="number" id="efg_pct" name="efg_pct" step="0.001" min="0" max="1" placeholder="0.54" required>
                         </div>
 
                         <div class="form-group">
-                            <label for="oreb">Offensive Rebounds (OREB)</label>
-                            <input type="number" id="oreb" name="oreb" step="0.1" min="0" placeholder="10" required>
+                            <label for="tov_pct">Turnover % (TOV%)</label>
+                            <input type="number" id="tov_pct" name="tov_pct" step="0.001" min="0" max="1" placeholder="0.13" required>
                         </div>
 
                         <div class="form-group">
-                            <label for="dreb">Defensive Rebounds (DREB)</label>
-                            <input type="number" id="dreb" name="dreb" step="0.1" min="0" placeholder="30" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="stl">Steals (STL)</label>
-                            <input type="number" id="stl" name="stl" step="0.1" min="0" placeholder="8" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="blk">Blocks (BLK)</label>
-                            <input type="number" id="blk" name="blk" step="0.1" min="0" placeholder="5" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="tov">Turnovers (TOV)</label>
-                            <input type="number" id="tov" name="tov" step="0.1" min="0" placeholder="12" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="pf">Personal Fouls (PF)</label>
-                            <input type="number" id="pf" name="pf" step="0.1" min="0" placeholder="18" required>
+                            <label for="orb_pct">Offensive Rebound % (ORB%)</label>
+                            <input type="number" id="orb_pct" name="orb_pct" step="0.001" min="0" max="1" placeholder="0.25" required>
                         </div>
                     </div>
 
@@ -619,25 +603,6 @@
             </div>
         </div>
 
-        <!-- Upload Games Section -->
-        <div class="card">
-            <h2>Upload Games</h2>
-            <p style="color: #aaa; margin-bottom: 15px; font-size: 0.9em;">Upload a CSV file with games to add to training data. Model will automatically retrain on all data (historical + uploaded).</p>
-            
-            <div id="uploadArea" style="border: 2px dashed #4CAF50; border-radius: 8px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s; background: rgba(76, 175, 80, 0.05);">
-                <input type="file" id="csvFile" accept=".csv" style="display: none;">
-                <div style="color: #4CAF50; font-size: 1.3em; margin-bottom: 10px;">📁</div>
-                <div style="color: #fff; margin-bottom: 5px;">Click to upload or drag & drop</div>
-                <div style="color: #aaa; font-size: 0.85em;">CSV format: location, date, opponent, fg_pct, fg3_pct, fta, oreb, dreb, stl, blk, tov, pf, actual_result</div>
-            </div>
-
-            <div id="uploadStatus" style="margin-top: 15px; display: none;">
-                <div id="uploadMessage" style="color: #4CAF50;"></div>
-            </div>
-
-            <div id="uploadError" style="margin-top: 15px; color: #f44336; display: none;"></div>
-        </div>
-
         <!-- Bottom: Game-by-Game Results -->
         <div class="card">
             <h2>Recent Game Predictions</h2>
@@ -648,15 +613,11 @@
                             <th>Date</th>
                             <th>Opp</th>
                             <th>Type</th>
-                            <th>FG%</th>
-                            <th>3P%</th>
-                            <th>FTA</th>
-                            <th>OREB</th>
-                            <th>DREB</th>
-                            <th>STL</th>
-                            <th>BLK</th>
-                            <th>TOV</th>
-                            <th>PF</th>
+                            <th>Pace</th>
+                            <th>FTr</th>
+                            <th>eFG%</th>
+                            <th>TOV%</th>
+                            <th>ORB%</th>
                             <th>Pred</th>
                             <th>Actual</th>
                             <th>Prob</th>
@@ -665,7 +626,7 @@
                     </thead>
                     <tbody id="gamesTableBody">
                         <tr>
-                            <td colspan="15" style="text-align: center; color: #aaa;">Loading...</td>
+                            <td colspan="12" style="text-align: center; color: #aaa;">Loading...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -684,89 +645,6 @@
                 selectedLocation = e.target.dataset.location;
             });
         });
-
-        // Upload functionality
-        const uploadArea = document.getElementById("uploadArea");
-        const csvFile = document.getElementById("csvFile");
-        const uploadStatus = document.getElementById("uploadStatus");
-        const uploadMessage = document.getElementById("uploadMessage");
-        const uploadError = document.getElementById("uploadError");
-
-        uploadArea.addEventListener("click", () => csvFile.click());
-
-        uploadArea.addEventListener("dragover", (e) => {
-            e.preventDefault();
-            uploadArea.style.background = "rgba(76, 175, 80, 0.15)";
-            uploadArea.style.borderColor = "#45a049";
-        });
-
-        uploadArea.addEventListener("dragleave", () => {
-            uploadArea.style.background = "rgba(76, 175, 80, 0.05)";
-            uploadArea.style.borderColor = "#4CAF50";
-        });
-
-        uploadArea.addEventListener("drop", (e) => {
-            e.preventDefault();
-            uploadArea.style.background = "rgba(76, 175, 80, 0.05)";
-            uploadArea.style.borderColor = "#4CAF50";
-            
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                csvFile.files = files;
-                handleFileUpload(files[0]);
-            }
-        });
-
-        csvFile.addEventListener("change", (e) => {
-            if (e.target.files.length > 0) {
-                handleFileUpload(e.target.files[0]);
-            }
-        });
-
-        async function handleFileUpload(file) {
-            uploadError.style.display = "none";
-            uploadStatus.style.display = "none";
-
-            if (!file.name.endsWith(".csv")) {
-                uploadError.textContent = "Error: Please upload a CSV file";
-                uploadError.style.display = "block";
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append("file", file);
-
-            uploadMessage.textContent = "Uploading and retraining model...";
-            uploadStatus.style.display = "block";
-
-            try {
-                const response = await fetch("/upload-games", {
-                    method: "POST",
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    uploadMessage.innerHTML = `✓ Successfully uploaded ${data.games_count} games! Model has been retrained on all data.`;
-                    uploadMessage.style.color = "#4CAF50";
-                    
-                    // Reload game stats after successful upload
-                    setTimeout(() => {
-                        loadGameStats();
-                        csvFile.value = ""; // Reset file input
-                    }, 1000);
-                } else {
-                    uploadError.textContent = "Error: " + data.error;
-                    uploadError.style.display = "block";
-                    uploadStatus.style.display = "none";
-                }
-            } catch (err) {
-                uploadError.textContent = "Error: " + err.message;
-                uploadError.style.display = "block";
-                uploadStatus.style.display = "none";
-            }
-        }
 
         // Load game statistics on page load
         window.addEventListener("load", loadGameStats);
@@ -802,7 +680,7 @@
             tbody.innerHTML = "";
 
             if (games.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="16" style="text-align: center; color: #aaa;">No games found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; color: #aaa;">No games found</td></tr>';
                 return;
             }
 
@@ -816,21 +694,24 @@
                 const locationBadge = game.location === "home" ? "H" : "A";
                 
                 // Format date with year
-                const dateStr = new Date(game.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+                const dateStr = game.date
+                    ? new Date(game.date + "T00:00:00Z").toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "2-digit",
+                        timeZone: "UTC"
+                    })
+                    : "--";
 
                 row.innerHTML = `
                     <td>${dateStr}</td>
                     <td>${game.opponent || "?"}</td>
                     <td><span class="location-badge">${locationBadge}</span></td>
-                    <td>${(game.fg_pct_home || game.fg_pct_away || 0).toFixed(3)}</td>
-                    <td>${(game.fg3_pct_home || game.fg3_pct_away || 0).toFixed(3)}</td>
-                    <td>${(game.fta_home || game.fta_away || 0).toFixed(1)}</td>
-                    <td>${(game.oreb_home || game.oreb_away || 0).toFixed(1)}</td>
-                    <td>${(game.dreb_home || game.dreb_away || 0).toFixed(1)}</td>
-                    <td>${(game.stl_home || game.stl_away || 0).toFixed(1)}</td>
-                    <td>${(game.blk_home || game.blk_away || 0).toFixed(1)}</td>
-                    <td>${(game.tov_home || game.tov_away || 0).toFixed(1)}</td>
-                    <td>${(game.pf_home || game.pf_away || 0).toFixed(1)}</td>
+                    <td>${(game.pace || 0).toFixed(1)}</td>
+                    <td>${(game.ftr || 0).toFixed(3)}</td>
+                    <td>${(game.efg_pct || 0).toFixed(3)}</td>
+                    <td>${(game.tov_pct || 0).toFixed(3)}</td>
+                    <td>${(game.orb_pct || 0).toFixed(3)}</td>
                     <td>${predictionText}</td>
                     <td>${actualText}</td>
                     <td>${(game.win_prob * 100).toFixed(0)}%</td>
@@ -855,15 +736,11 @@
 
             const formData = {
                 location: selectedLocation,
-                fg_pct: parseFloat(document.getElementById("fg_pct").value),
-                fg3_pct: parseFloat(document.getElementById("fg3_pct").value),
-                fta: parseFloat(document.getElementById("fta").value),
-                oreb: parseFloat(document.getElementById("oreb").value),
-                dreb: parseFloat(document.getElementById("dreb").value),
-                stl: parseFloat(document.getElementById("stl").value),
-                blk: parseFloat(document.getElementById("blk").value),
-                tov: parseFloat(document.getElementById("tov").value),
-                pf: parseFloat(document.getElementById("pf").value)
+                pace: parseFloat(document.getElementById("pace").value),
+                ftr: parseFloat(document.getElementById("ftr").value),
+                efg_pct: parseFloat(document.getElementById("efg_pct").value),
+                tov_pct: parseFloat(document.getElementById("tov_pct").value),
+                orb_pct: parseFloat(document.getElementById("orb_pct").value)
             };
 
             try {
