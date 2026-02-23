@@ -1,5 +1,1 @@
-location,date,opponent,fg_pct,fg3_pct,fta,oreb,dreb,stl,blk,tov,pf,actual_result
-away,2026-02-19,Warriors,0.52,0.43,7,13,41,7,6,13,6,1
-home,2026-02-11,Bulls,0.52,0.4,13,13,35,9,8,14,15,1
-home,2026-02-08,Knicks,0.37,0.17,15,14,30,4,3,10,21,0
-home,2026-02-06,Heat,0.42,0.28,23,13,37,7,7,16,16,1
+deprecated

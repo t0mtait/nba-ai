@@ -1,39 +1,19 @@
-import kagglehub
-import os
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report
+from data_loader import load_celtics_games, FEATURE_COLUMNS
 
-path = kagglehub.dataset_download("wyattowalsh/basketball")
+games = load_celtics_games("data")
 
-
-game_path = os.path.join(path, "csv", "game.csv")
-game_all = pd.read_csv(game_path)
-
-# Filter for BOS games (Since 2000)
-game_bos_home = game_all[game_all["team_abbreviation_home"] == "BOS"].copy()
-game_bos_away = game_all[game_all["team_abbreviation_away"] == "BOS"].copy()
-
-home_games = game_bos_home[game_bos_home["game_date"] >= "2000-01-01"].copy()
-away_games = game_bos_away[game_bos_away["game_date"] >= "2000-01-01"].copy()
-
-home_games = home_games.drop_duplicates()
-away_games = away_games.drop_duplicates()
-
-home_games["celtics_win"] = (home_games["wl_home"] == "W")
-away_games["celtics_win"] = (away_games["wl_home"] == "L")
+home_games = games[games["location"] == "home"].copy()
+away_games = games[games["location"] == "away"].copy()
 
 y1 = home_games["celtics_win"]
 y2 = away_games["celtics_win"]
 
-feature_cols1 = ["fg_pct_home", "fg3_pct_home","fta_home",
-                 "oreb_home","dreb_home","stl_home",
-                 "blk_home","tov_home","pf_home"]
-
-feature_cols2 = ["fg_pct_away", "fg3_pct_away","fta_away",
-                 "oreb_away","dreb_away","stl_away",
-                 "blk_away","tov_away","pf_away"]
+feature_cols1 = FEATURE_COLUMNS
+feature_cols2 = FEATURE_COLUMNS
 
 
 subset1 = home_games[feature_cols1]

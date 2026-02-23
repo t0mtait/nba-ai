@@ -1,5 +1,4 @@
 """Train and save the Celtics prediction models."""
-import kagglehub
 import os
 import pandas as pd
 import numpy as np
@@ -7,36 +6,18 @@ import pickle
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report
+from data_loader import load_celtics_games, FEATURE_COLUMNS
 
-# Download dataset
-path = kagglehub.dataset_download("wyattowalsh/basketball")
+games = load_celtics_games("data")
 
-game_path = os.path.join(path, "csv", "game.csv")
-game_all = pd.read_csv(game_path)
-
-# Filter for BOS games (Since 2000)
-game_bos_home = game_all[game_all["team_abbreviation_home"] == "BOS"].copy()
-game_bos_away = game_all[game_all["team_abbreviation_away"] == "BOS"].copy()
-
-home_games = game_bos_home[game_bos_home["game_date"] >= "2000-01-01"].copy()
-away_games = game_bos_away[game_bos_away["game_date"] >= "2000-01-01"].copy()
-
-home_games = home_games.drop_duplicates()
-away_games = away_games.drop_duplicates()
-
-home_games["celtics_win"] = (home_games["wl_home"] == "W")
-away_games["celtics_win"] = (away_games["wl_away"] == "W")  # Fixed: was "wl_home" == "L"
+home_games = games[games["location"] == "home"].copy()
+away_games = games[games["location"] == "away"].copy()
 
 y1 = home_games["celtics_win"]
 y2 = away_games["celtics_win"]
 
-feature_cols1 = ["fg_pct_home", "fg3_pct_home", "fta_home",
-                 "oreb_home", "dreb_home", "stl_home",
-                 "blk_home", "tov_home", "pf_home"]
-
-feature_cols2 = ["fg_pct_away", "fg3_pct_away", "fta_away",
-                 "oreb_away", "dreb_away", "stl_away",
-                 "blk_away", "tov_away", "pf_away"]
+feature_cols1 = FEATURE_COLUMNS
+feature_cols2 = FEATURE_COLUMNS
 
 subset1 = home_games[feature_cols1]
 subset2 = away_games[feature_cols2]
@@ -44,11 +25,14 @@ subset2 = away_games[feature_cols2]
 mask1 = subset1.notna().all(axis=1)
 mask2 = subset2.notna().all(axis=1)
 
-subset1 = subset1[mask1]
-y1 = y1[mask1]
+home_games = home_games.loc[mask1].copy()
+away_games = away_games.loc[mask2].copy()
 
-subset2 = subset2[mask2]
-y2 = y2[mask2]
+subset1 = home_games[feature_cols1]
+y1 = home_games["celtics_win"]
+
+subset2 = away_games[feature_cols2]
+y2 = away_games["celtics_win"]
 
 print("Home:", subset1.shape, y1.shape)
 print("Away:", subset2.shape, y2.shape)
@@ -96,42 +80,31 @@ with open("models/model_away.pkl", "wb") as f:
 with open("models/feature_cols.pkl", "wb") as f:
     pickle.dump({"home": feature_cols1, "away": feature_cols2}, f)
 
-# Generate game-by-game predictions for display
-home_predictions = model_home.predict(X_test1)
-home_probs = model_home.predict_proba(X_test1)
-away_predictions = model_away.predict(X_test2)
-away_probs = model_away.predict_proba(X_test2)
+home_predictions = model_home.predict(subset1)
+home_probs = model_home.predict_proba(subset1)
+away_predictions = model_away.predict(subset2)
+away_probs = model_away.predict_proba(subset2)
 
-# Get the game dates from original data
-home_test_indices = X_test1.index
-away_test_indices = X_test2.index
+home_games_pred = subset1.copy()
+home_games_pred["location"] = "home"
+home_games_pred["date"] = home_games["date"].values
+home_games_pred["opponent"] = home_games["opponent"].values
+home_games_pred["prediction"] = home_predictions
+home_games_pred["actual"] = y1.values
+home_games_pred["win_prob"] = home_probs[:, 1]
+home_games_pred["correct"] = home_predictions == y1.values
 
-home_dates = home_games.loc[home_test_indices, "game_date"].values
-away_dates = away_games.loc[away_test_indices, "game_date"].values
-home_opponents = home_games.loc[home_test_indices, "team_abbreviation_away"].values
-away_opponents = away_games.loc[away_test_indices, "team_abbreviation_home"].values
-
-# Create DataFrames for game predictions with features
-home_games_test = X_test1.copy()
-home_games_test["location"] = "home"
-home_games_test["date"] = home_dates
-home_games_test["opponent"] = home_opponents
-home_games_test["prediction"] = home_predictions
-home_games_test["actual"] = y_test1.values
-home_games_test["win_prob"] = home_probs[:, 1]
-home_games_test["correct"] = home_predictions == y_test1.values
-
-away_games_test = X_test2.copy()
-away_games_test["location"] = "away"
-away_games_test["date"] = away_dates
-away_games_test["opponent"] = away_opponents
-away_games_test["prediction"] = away_predictions
-away_games_test["actual"] = y_test2.values
-away_games_test["win_prob"] = away_probs[:, 1]
-away_games_test["correct"] = away_predictions == y_test2.values
+away_games_pred = subset2.copy()
+away_games_pred["location"] = "away"
+away_games_pred["date"] = away_games["date"].values
+away_games_pred["opponent"] = away_games["opponent"].values
+away_games_pred["prediction"] = away_predictions
+away_games_pred["actual"] = y2.values
+away_games_pred["win_prob"] = away_probs[:, 1]
+away_games_pred["correct"] = away_predictions == y2.values
 
 # Combine and save
-all_games = pd.concat([home_games_test, away_games_test], ignore_index=True)
+all_games = pd.concat([home_games_pred, away_games_pred], ignore_index=True)
 all_games.to_csv("models/game_predictions.csv", index=False)
 
 print("\nModels saved to models/")
