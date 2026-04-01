@@ -78,9 +78,17 @@ def load_celtics_games(data_dir: str = "data") -> pd.DataFrame:
     data["date"] = pd.to_datetime(data["Date"], errors="coerce").dt.strftime("%Y-%m-%d")
     data["opponent"] = data["Opponent"].astype(str)
 
+    # Normalize percentage columns (stored as 0-100 scale in CSV, should be 0-1 for model)
+    percent_cols = ["tov_pct", "orb_pct"]
+    for col in percent_cols:
+        if col in data.columns:
+            data[col] = pd.to_numeric(data[col], errors="coerce") / 100.0
+
+    # Ensure other numeric columns are properly typed
     for col in FEATURE_COLUMNS:
         if col not in data.columns:
             raise KeyError(f"Missing required column '{col}' in {data_dir} CSVs")
-        data[col] = pd.to_numeric(data[col], errors="coerce")
+        if col not in percent_cols:
+            data[col] = pd.to_numeric(data[col], errors="coerce")
 
     return data
