@@ -52,10 +52,10 @@ async def predict(request: PredictionRequest):
         model = model_away
         cols = feature_cols["away"]
 
-    features = [getattr(request, col) for col in cols]
-    
-    prediction = model.predict([features])[0]
-    probability = model.predict_proba([features])[0]
+    features = pd.DataFrame([[getattr(request, col) for col in cols]], columns=cols)
+
+    prediction = model.predict(features)[0]
+    probability = model.predict_proba(features)[0]
     
     return {
         "location": request.location,
