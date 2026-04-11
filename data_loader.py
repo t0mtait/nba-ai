@@ -1,6 +1,8 @@
 """Load Celtics game data from local /data CSV files."""
 from __future__ import annotations
 
+from typing import List
+
 import glob
 import os
 
