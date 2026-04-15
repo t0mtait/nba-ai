@@ -13,6 +13,7 @@ import pandas as pd
 import pickle
 
 import db
+import train_models as tm
 from data_loader import load_games_from_db, FEATURE_COLUMNS
 
 # Configure logging
@@ -335,6 +336,53 @@ async def db_stats():
         }
     except Exception as e:
         logger.error(f"Error fetching DB stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class TrainRequest(BaseModel):
+    team_code: str = Field(default="BOS", max_length=10)
+    season_year: Optional[int] = None
+
+
+@app.post("/api/train")
+async def train_team(body: TrainRequest):
+    """
+    Train prediction models for a team.
+
+    Uses chronological split: last 20 games are held out as test,
+    all older games are used for training.
+
+    Returns training and test accuracy metrics.
+    """
+    team_code = body.team_code.upper()
+    logger.info(f"Training models for {team_code} (season={body.season_year})")
+
+    try:
+        # Check if we have games for this team
+        games = load_games_from_db(team_code=team_code, season_year=body.season_year)
+        if games.empty:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No games found in database for {team_code}. Fetch data first."
+            )
+
+        # Run training (CPU-bound, runs in-process)
+        result = tm.train_models(
+            team_code=team_code,
+            season_year=body.season_year,
+            output_dir=MODELS_DIR,
+        )
+
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+
+        logger.info(f"Training complete for {team_code}: {result}")
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error training {team_code}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

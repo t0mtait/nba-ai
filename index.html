@@ -231,6 +231,11 @@
             animation: pulse 1s infinite;
         }
 
+        .status-dot.training {
+            background: #f59e0b;
+            animation: pulse 1s infinite;
+        }
+
         /* Grid Layout */
         .main-grid {
             display: grid;
@@ -783,9 +788,19 @@
                 </svg>
                 Fetch Games
             </button>
+            <button id="trainBtn" class="fetch-btn" style="background: linear-gradient(135deg, #16a34a, #15803d);">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+                Train Model
+            </button>
             <div id="fetchStatus" class="fetch-status hidden">
                 <span class="status-dot" id="statusDot"></span>
                 <span id="statusText"></span>
+            </div>
+            <div id="trainStatus" class="fetch-status hidden">
+                <span class="status-dot training" id="trainDot"></span>
+                <span id="trainText"></span>
             </div>
         </div>
 
@@ -1228,6 +1243,51 @@
                 fetchBtn.disabled = false;
             }
         }
+
+        async function trainModel() {
+            const trainBtn = document.getElementById('trainBtn');
+            const trainDot = document.getElementById('trainDot');
+            const trainText = document.getElementById('trainText');
+            const trainStatus = document.getElementById('trainStatus');
+
+            trainBtn.disabled = true;
+            trainStatus.classList.remove('hidden');
+            trainDot.classList.remove('active');
+            trainDot.classList.add('training');
+            trainText.textContent = `Training ${selectedTeam} model…`;
+
+            try {
+                const resp = await fetch('/api/train', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ team_code: selectedTeam }),
+                });
+
+                const data = await resp.json();
+
+                if (!resp.ok) {
+                    throw new Error(data.detail || 'Training failed');
+                }
+
+                trainDot.classList.remove('training');
+                trainDot.classList.add('active');
+                const acc = typeof data.training_accuracy === 'number' ? data.training_accuracy.toFixed(1) + '%' : '--';
+                const testAcc = typeof data.test_accuracy === 'number' ? data.test_accuracy.toFixed(1) + '%' : '--';
+                trainText.textContent = `✓ ${selectedTeam} trained! ${data.total_games} games | Train: ${acc} | Test: ${testAcc}`;
+
+                // Refresh game stats for this team
+                loadGameStats(selectedTeam);
+
+            } catch (err) {
+                trainDot.classList.remove('training');
+                trainDot.classList.add('active');
+                trainText.textContent = '✗ ' + err.message;
+            } finally {
+                trainBtn.disabled = false;
+            }
+        }
+
+        document.getElementById('trainBtn').addEventListener('click', trainModel);
     </script>
 </body>
 </html>
