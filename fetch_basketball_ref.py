@@ -151,49 +151,48 @@ def fetch_team_season(
 
     soup = BeautifulSoup(response.text, "lxml")
 
-    # Find the advanced stats table - it has an id like "tfooter_BOS" for the advanced section
-    # The page structure: regular stats table + advanced stats table
-    # We need to find the row that corresponds to the "Advanced" statistics
-    # Actually looking at the CSV, the columns are: ORtg, DRtg, Pace, FTr, 3PAr, TS%, etc.
-    # This is in the "Advanced" section of the table
-
     games = []
 
     # Find ALL tables with "team_stats" in their id
     all_tables = soup.find_all("table")
     logger.info(f"Found {len(all_tables)} tables on the page")
 
-    # The regular gamelog table has id "tfooter_{TEAM}" but it's actually for basic stats
-    # We need to parse the table and extract the columns we need
-
-    # Look for the table - it typically has the game-by-game data
-    # Structure: <table id="tfooter_{TEAM}"> contains the advanced stats
-    # But actually the table with advanced stats has headers like: ORtg, DRtg, Pace, FTr, etc.
-
-    # Find the correct table by looking for the Pace column header
+    # The table ID is now "team_game_log_adv_reg" for advanced stats
+    target_table = None
     for table in all_tables:
-        thead = table.find("thead")
-        if not thead:
-            continue
+        table_id = table.get("id", "")
+        if "team_game_log_adv" in table_id or table_id == "team_game_log_adv_reg":
+            thead = table.find("thead")
+            if thead:
+                target_table = table
+                logger.info(f"Found advanced stats table with id: {table_id}")
+                break
 
-        # Get all header text
-        headers_text = [th.get_text(strip=True) for th in thead.find_all("th")]
-        headers_str = " ".join(headers_text)
-
-        # Look for advanced stats columns
-        if "ORtg" in headers_str and "DRtg" in headers_str and "Pace" in headers_str:
-            logger.info(f"Found advanced stats table with headers: {headers_text[:10]}...")
-            games = _parse_advanced_table(table, team_code)
-            break
+    if target_table:
+        games = _parse_advanced_table(target_table, team_code)
+    else:
+        # Fallback: find table with ORtg in second header row
+        for table in all_tables:
+            thead = table.find("thead")
+            if not thead:
+                continue
+            header_rows = thead.find_all("tr")
+            if len(header_rows) >= 2:
+                # Check second row (index 1) for ORtg
+                second_row_headers = [th.get_text(strip=True) for th in header_rows[1].find_all("th")]
+                if "ORtg" in second_row_headers:
+                    logger.info(f"Found advanced table via fallback with headers: {second_row_headers[:10]}...")
+                    games = _parse_advanced_table(table, team_code)
+                    break
 
     if not games:
-        # Fallback: try to find any table with game data
+        # Fallback: try generic table parsing
         for table in all_tables:
             tbody = table.find("tbody")
             if not tbody:
                 continue
             rows = tbody.find_all("tr")
-            if len(rows) > 10:  # Likely a game log
+            if len(rows) > 10:
                 games = _parse_generic_table(table, team_code)
                 if games:
                     break
@@ -216,135 +215,134 @@ def _parse_advanced_table(table: BeautifulSoup, team_code: str) -> list[dict]:
     if not tbody:
         return games
 
-    # Find header row to get column indices
     thead = table.find("thead")
     if not thead:
         return games
 
+    # Headers are spread across TWO rows:
+    # Row 0: ['', 'Score', 'Advanced', 'Offensive Four Factors', 'Defensive Four Factors'] (section labels)
+    # Row 1: ['Rk', 'Gtm', 'Date', '', 'Opp', 'Rslt', 'Tm', 'Opp', 'OT', 'ORtg', 'DRtg', 'Pace', 'FTr', '3PAr', 'TS%']... (actual column names)
     header_rows = thead.find_all("tr")
-    # The last header row contains the actual column names
-    last_header_row = header_rows[-1] if header_rows else None
-    if not last_header_row:
+    if len(header_rows) < 2:
+        logger.warning("Expected 2 header rows, found %d", len(header_rows))
         return games
 
-    header_ths = last_header_row.find_all("th")
+    # Use the second row (index 1) for actual column names
+    actual_header_row = header_rows[1]
+    header_ths = actual_header_row.find_all("th")
     headers = [th.get_text(strip=True) for th in header_ths]
 
-    # Map column names to indices
-    col_map = {}
-    for idx, h in enumerate(headers):
-        if h in ("ORtg", "DRtg", "Pace", "FTr", "3PAr", "TS%", "eFG%", "TOV%", "ORB%"):
-            col_map[h] = idx
+    # Build column index map from data-stat attributes
+    col_indices = {}
+    stat_to_col = {}
 
-    # Also need basic columns: Date, Opp, Rslt
-    # These might be in earlier th elements
-    date_idx = None
-    opp_idx = None
-    rslt_idx = None
+    for idx, th in enumerate(header_ths):
+        header_text = th.get_text(strip=True)
+        data_stat = th.get("data-stat", "")
 
-    # Find by looking at the second header row (first is usually row labels)
-    if len(header_rows) >= 2:
-        second_row = header_rows[-2] if len(header_rows) >= 2 else header_rows[0]
-        second_headers = [th.get_text(strip=True) for th in second_row.find_all("th")]
-        for idx, h in enumerate(second_headers):
-            if h == "Date":
-                date_idx = idx
-            elif h == "Opp":
-                opp_idx = idx
-            elif h == "Rslt":
-                rslt_idx = idx
+        if header_text:
+            col_indices[header_text] = idx
+        if data_stat:
+            stat_to_col[data_stat] = idx
+
+    # Key data-stat names (updated per issue):
+    # pace, ft_rate (was ftr), efg_pct, team_tov_pct (was tov_pct), team_orb_pct (was orb_pct)
+    date_idx = stat_to_col.get("date", col_indices.get("Date"))
+    opp_idx = stat_to_col.get("opp_name_abbr", col_indices.get("Opp"))
+    rslt_idx = stat_to_col.get("team_game_result", col_indices.get("Rslt"))
+    location_idx = stat_to_col.get("game_location")
+    pace_idx = stat_to_col.get("pace", col_indices.get("Pace"))
+    ftr_idx = stat_to_col.get("ft_rate", col_indices.get("FTr"))
+    efg_idx = stat_to_col.get("efg_pct", col_indices.get("eFG%"))
+    tov_idx = stat_to_col.get("team_tov_pct", col_indices.get("TOV%"))
+    orb_idx = stat_to_col.get("team_orb_pct", col_indices.get("ORB%"))
+
+    def get_cell_text(row_cells: list, idx: int) -> str:
+        if idx is not None and idx < len(row_cells):
+            return row_cells[idx].get_text(strip=True)
+        return ""
+
+    def get_cell_float(row_cells: list, idx: int) -> float:
+        if idx is None:
+            return 0.0
+        text = get_cell_text(row_cells, idx)
+        try:
+            # Handle percentage
+            if "%" in text:
+                return float(text.replace("%", "")) / 100
+            # Handle decimal without leading 0 (e.g., .253)
+            if text.startswith("."):
+                text = "0" + text
+            return float(text)
+        except (ValueError, TypeError):
+            return 0.0
 
     rows = tbody.find_all("tr")
     for row in rows:
         # Skip header/section rows
-        if "class" in row.attrs and ("thead" in row["class"] or "stat_column" in row["class"]):
+        if row.get("class") and ("thead" in row.get("class", []) or "stat_column" in row.get("class", [])):
             continue
+        if row.get("data-row"):
+            pass  # Skip spacer rows
 
         cells = row.find_all(["th", "td"])
         if len(cells) < 5:
             continue
 
-        # Extract data using indices
-        def get_cell_text(idx: int) -> str:
-            if idx is not None and idx < len(cells):
-                return cells[idx].get_text(strip=True)
-            return ""
+        # Get data using data-stat attributes directly
+        data_stats = {}
+        for cell in cells:
+            stat = cell.get("data-stat", "")
+            if stat:
+                data_stats[stat] = cell.get_text(strip=True)
 
-        def get_cell_float(idx: int) -> float:
-            text = get_cell_text(idx)
-            try:
-                return float(text.replace("%", "")) / 100 if "%" in text else float(text)
-            except (ValueError, TypeError):
-                return 0.0
+        # Extract values from data-stat map
+        date_str = data_stats.get("date", "")
+        opponent = data_stats.get("opp_name_abbr", "").lstrip("@")
+        result_str = data_stats.get("team_game_result", "")
+        location_str = data_stats.get("game_location", "")
 
-        date_str = get_cell_text(date_idx) if date_idx is not None else ""
-        opp_str = get_cell_text(opp_idx) if opp_idx is not None else ""
-        rslt_str = get_cell_text(rslt_idx) if rslt_idx is not None else ""
-
-        # Skip if no valid data
-        if not date_str or not opp_str or not rslt_str:
+        # Skip invalid rows
+        if not date_str or not opponent or not result_str:
             continue
         if date_str in ("Date", "Rk", ""):
             continue
 
         # Parse date (format: YYYY-MM-DD)
         try:
-            # The date might be in different formats, try to parse
             game_date = datetime.strptime(date_str, "%Y-%m-%d").strftime("%Y-%m-%d")
         except ValueError:
-            # Try other formats
             try:
                 game_date = datetime.strptime(date_str, "%b %d, %Y").strftime("%Y-%m-%d")
             except ValueError:
                 game_date = date_str
 
-        # Determine location: @ prefix means away
-        location = "away" if opp_str.startswith("@") else "home"
-        opponent = opp_str.lstrip("@")
+        # Determine location: @ prefix means away, game_location data-stat is "@" for away
+        location = "away" if location_str == "@" or opponent.startswith("@") else "home"
+        opponent = opponent.lstrip("@")
 
         # Parse result
-        result = "W" if rslt_str.startswith("W") else "L"
+        result = "W" if result_str.startswith("W") else "L"
 
-        # Extract advanced stats using column mappings
-        # Headers we need: Pace, FTr, eFG%, TOV%, ORB%
-        pace = 0.0
-        ftr = 0.0
-        efg_pct = 0.0
-        tov_pct = 0.0
-        orb_pct = 0.0
+        # Extract advanced stats using correct data-stat names
+        # FTr values are stored as .253 (decimal without leading 0)
+        def safe_float_stat(stat_name: str, divisor: float = 1.0) -> float:
+            val = data_stats.get(stat_name, "")
+            try:
+                if not val:
+                    return 0.0
+                # Handle decimal without leading 0
+                if val.startswith("."):
+                    val = "0" + val
+                return float(val) / divisor
+            except (ValueError, TypeError):
+                return 0.0
 
-        # Try to get from col_map (column index based)
-        if "Pace" in col_map:
-            pace = get_cell_float(col_map["Pace"])
-        if "FTr" in col_map:
-            ftr = get_cell_float(col_map["FTr"])
-        if "eFG%" in col_map:
-            efg_pct = get_cell_float(col_map["eFG%"])
-        if "TOV%" in col_map:
-            tov_pct = get_cell_float(col_map["TOV%"])
-        if "ORB%" in col_map:
-            orb_pct = get_cell_float(col_map["ORB%"])
-
-        # If col_map didn't work, try by finding cells with header text
-        if pace == 0.0:
-            # Find cells by their header (stored in data-stat attribute)
-            for cell in cells:
-                stat = cell.get("data-stat", "")
-                val = cell.get_text(strip=True)
-
-                try:
-                    if stat == "pace":
-                        pace = float(val)
-                    elif stat == "ftr":
-                        ftr = float(val)
-                    elif stat == "efg_pct":
-                        efg_pct = float(val) / 100 if val else 0.0
-                    elif stat == "tov_pct":
-                        tov_pct = float(val) / 100 if val else 0.0
-                    elif stat == "orb_pct":
-                        orb_pct = float(val) / 100 if val else 0.0
-                except (ValueError, TypeError):
-                    pass
+        pace = safe_float_stat("pace")
+        ftr = safe_float_stat("ft_rate")  # ft_rate stored as proportion (.253), no divisor
+        efg_pct = safe_float_stat("efg_pct")  # stored as proportion (.511), no divisor
+        tov_pct = safe_float_stat("team_tov_pct", 100)  # stored as percentage (9.7%), needs divisor
+        orb_pct = safe_float_stat("team_orb_pct", 100)  # stored as percentage (25.0%), needs divisor
 
         game = {
             "date": game_date,
@@ -364,7 +362,7 @@ def _parse_advanced_table(table: BeautifulSoup, team_code: str) -> list[dict]:
 
 
 def _parse_generic_table(table: BeautifulSoup, team_code: str) -> list[dict]:
-    """Fallback parser for generic tables."""
+    """Fallback parser for generic tables using data-stat attributes."""
     games = []
 
     tbody = table.find("tbody")
@@ -377,21 +375,23 @@ def _parse_generic_table(table: BeautifulSoup, team_code: str) -> list[dict]:
         if len(cells) < 8:
             continue
 
-        # Try to extract using data-stat attributes
+        # Get data using data-stat attributes
         data = {}
         for cell in cells:
             stat = cell.get("data-stat", "")
             val = cell.get_text(strip=True)
-            data[stat] = val
+            if stat:
+                data[stat] = val
 
         # Check if this looks like a game row
-        if not data.get("date_game") or not data.get("opp_id"):
+        if not data.get("date") or not data.get("opp_name_abbr"):
             continue
 
-        # Get basic info
-        date_str = data.get("date_game", "")
-        opponent = data.get("opp_id", "").lstrip("@")
-        result = data.get("game_result", "")
+        # Get basic info - use corrected stat names
+        date_str = data.get("date", "")
+        opponent = data.get("opp_name_abbr", "").lstrip("@")
+        result_str = data.get("team_game_result", "")
+        location_str = data.get("game_location", "")
 
         if not date_str or not opponent:
             continue
@@ -405,15 +405,19 @@ def _parse_generic_table(table: BeautifulSoup, team_code: str) -> list[dict]:
             except ValueError:
                 game_date = date_str
 
-        location = "away" if data.get("opp_id", "").startswith("@") else "home"
-        result_char = "W" if result.startswith("W") else "L"
+        location = "away" if location_str == "@" else "home"
+        result_char = "W" if result_str.startswith("W") else "L"
 
-        # Get advanced stats
-        def safe_float(val: str) -> float:
+        # Get advanced stats - use corrected stat names
+        def safe_float(val: str, divisor: float = 1.0) -> float:
             try:
+                if not val:
+                    return 0.0
+                if val.startswith("."):
+                    val = "0" + val
                 if "%" in val:
                     return float(val.replace("%", "")) / 100
-                return float(val)
+                return float(val) / divisor
             except (ValueError, TypeError):
                 return 0.0
 
@@ -423,10 +427,10 @@ def _parse_generic_table(table: BeautifulSoup, team_code: str) -> list[dict]:
             "opponent": opponent,
             "result": result_char,
             "pace": safe_float(data.get("pace", "0")),
-            "ftr": safe_float(data.get("ftr", "0")),
-            "efg_pct": safe_float(data.get("efg_pct", "0")),
-            "tov_pct": safe_float(data.get("tov_pct", "0")),
-            "orb_pct": safe_float(data.get("orb_pct", "0")),
+            "ftr": safe_float(data.get("ft_rate", "0")),  # ft_rate, stored as proportion (.253)
+            "efg_pct": safe_float(data.get("efg_pct", "0")),  # stored as proportion (.511), no divisor
+            "tov_pct": safe_float(data.get("team_tov_pct", "0"), 100),  # stored as percentage (9.7%)
+            "orb_pct": safe_float(data.get("team_orb_pct", "0"), 100),  # stored as percentage (25.0%)
         }
 
         games.append(game)

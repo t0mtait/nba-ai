@@ -14,3 +14,4 @@ venv/
 !models/game_predictions.csv
 uploaded_games/
 .pytest_cache/
+.cache/
