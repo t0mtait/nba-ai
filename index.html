@@ -180,14 +180,15 @@
         }
 
         .season-input {
-            width: 70px;
-            padding: 8px 12px;
+            width: 90px;
+            padding: 8px 8px;
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             color: var(--text);
             font-size: 0.9rem;
             text-align: center;
+            appearance: textfield;
         }
 
         .season-input:focus {
@@ -236,7 +237,7 @@
 
         @media (min-width: 1100px) {
             .main-grid {
-                grid-template-columns: 400px 1fr;
+                grid-template-columns: 420px 1fr;
             }
         }
 
@@ -669,11 +670,20 @@
             font-size: 0.9rem;
         }
 
+        /* Left Column */
+        .left-col {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            min-width: 0;
+        }
+
         /* Right Column */
         .right-col {
             display: flex;
             flex-direction: column;
             gap: 24px;
+            min-width: 0;
         }
 
         /* Responsive */
@@ -960,7 +970,7 @@
         document.getElementById('teamSelect').addEventListener('change', (e) => {
             selectedTeam = e.target.value;
             document.getElementById('teamBadge').textContent = selectedTeam;
-            loadGameStats();
+            loadGameStats(selectedTeam);
         });
 
         // Location selector
@@ -984,14 +994,14 @@
         // Load on start
         window.addEventListener('load', loadGameStats);
 
-        async function loadGameStats() {
+        async function loadGameStats(teamCode = "BOS") {
             const spinner = document.getElementById('statsSpinner');
             const error = document.getElementById('statsError');
             spinner.classList.add('show');
             error.classList.remove('show');
 
             try {
-                const resp = await fetch('/game-stats');
+                const resp = await fetch(`/game-stats?team_code=${teamCode}`);
                 if (!resp.ok) {
                     if (resp.status === 404) {
                         setStatsEmpty();

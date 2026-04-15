@@ -5,7 +5,7 @@ import os
 import logging
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
@@ -37,51 +37,37 @@ app.add_middleware(
 MODELS_DIR = os.environ.get("MODELS_DIR", "models")
 DATABASE_PATH = os.environ.get("DATABASE_PATH", os.path.join(os.path.dirname(__file__), "nba_games.db"))
 
-# Global model containers
-_model_home = None
-_model_away = None
-_feature_cols = None
-_load_error = None
+
+def _get_model_paths(team_code: str):
+    """Get model paths for a team, with fallback to default models."""
+    model_home_path = os.path.join(MODELS_DIR, f"model_home_{team_code}.pkl")
+    model_away_path = os.path.join(MODELS_DIR, f"model_away_{team_code}.pkl")
+
+    # Fall back to default if team-specific doesn't exist
+    if not os.path.exists(model_home_path):
+        model_home_path = os.path.join(MODELS_DIR, "model_home.pkl")
+    if not os.path.exists(model_away_path):
+        model_away_path = os.path.join(MODELS_DIR, "model_away.pkl")
+
+    return model_home_path, model_away_path
 
 
-def _load_models():
-    """Load models and game predictions from disk."""
-    global _model_home, _model_away, _feature_cols, _load_error
-    if _load_error is not None:
-        raise _load_error
+def _load_models_for_team(team_code: str):
+    """Load models for a specific team."""
+    model_home_path, model_away_path = _get_model_paths(team_code)
 
     try:
-        with open(os.path.join(MODELS_DIR, "model_home.pkl"), "rb") as f:
-            _model_home = pickle.load(f)
-        with open(os.path.join(MODELS_DIR, "model_away.pkl"), "rb") as f:
-            _model_away = pickle.load(f)
+        with open(model_home_path, "rb") as f:
+            model_home = pickle.load(f)
+        with open(model_away_path, "rb") as f:
+            model_away = pickle.load(f)
         with open(os.path.join(MODELS_DIR, "feature_cols.pkl"), "rb") as f:
-            _feature_cols = pickle.load(f)
-        _load_error = None
+            feature_cols = pickle.load(f)
+        return model_home, model_away, feature_cols
     except FileNotFoundError as e:
-        _load_error = RuntimeError(f"Model file not found: {e}. Run train_models.py first.")
-        raise _load_error from e
+        raise RuntimeError(f"Model file not found: {e}. Run train_models.py first.")
     except Exception as e:
-        _load_error = RuntimeError(f"Failed to load models: {e}")
-        raise _load_error from e
-
-
-def _get_model_home():
-    if _model_home is None:
-        _load_models()
-    return _model_home
-
-
-def _get_model_away():
-    if _model_away is None:
-        _load_models()
-    return _model_away
-
-
-def _get_feature_cols():
-    if _feature_cols is None:
-        _load_models()
-    return _feature_cols
+        raise RuntimeError(f"Failed to load models: {e}")
 
 
 class PredictionRequest(BaseModel):
@@ -242,16 +228,16 @@ async def get_team_games(
 async def predict(request: PredictionRequest):
     """Predict game outcome based on game stats."""
     try:
-        feature_cols = _get_feature_cols()
+        model_home, model_away, feature_cols = _load_models_for_team(request.team_code)
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
     location = request.location.lower()
     if location == "home":
-        model = _get_model_home()
+        model = model_home
         cols = feature_cols.get("home", FEATURE_COLUMNS)
     else:
-        model = _get_model_away()
+        model = model_away
         cols = feature_cols.get("away", FEATURE_COLUMNS)
 
     # Build feature vector
@@ -272,10 +258,15 @@ async def predict(request: PredictionRequest):
 
 
 @app.get("/game-stats")
-async def game_stats():
-    """Get game-by-game prediction statistics from stored predictions."""
+async def game_stats(team_code: str = Query(default="BOS")):
+    """Get game-by-game prediction statistics for a team."""
     try:
-        preds_path = os.path.join(MODELS_DIR, "game_predictions.csv")
+        # Read from team-specific CSV
+        preds_path = os.path.join(MODELS_DIR, f"{team_code}_predictions.csv")
+        # Fall back to default if team-specific doesn't exist
+        if not os.path.exists(preds_path):
+            preds_path = os.path.join(MODELS_DIR, "game_predictions.csv")
+
         if not os.path.exists(preds_path):
             raise HTTPException(
                 status_code=404,
