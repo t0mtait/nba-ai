@@ -261,13 +261,16 @@ async def predict(request: PredictionRequest):
 async def game_stats(team_code: str = Query(default="BOS")):
     """Get game-by-game prediction statistics for a team."""
     try:
-        # Read from team-specific CSV
-        preds_path = os.path.join(MODELS_DIR, f"{team_code}_predictions.csv")
-        # Fall back to default if team-specific doesn't exist
-        if not os.path.exists(preds_path):
-            preds_path = os.path.join(MODELS_DIR, "game_predictions.csv")
+        team_preds_path = os.path.join(MODELS_DIR, f"{team_code}_predictions.csv")
+        default_preds_path = os.path.join(MODELS_DIR, "game_predictions.csv")
 
-        if not os.path.exists(preds_path):
+        if os.path.exists(team_preds_path):
+            preds_path = team_preds_path
+            used_fallback = False
+        elif os.path.exists(default_preds_path):
+            preds_path = default_preds_path
+            used_fallback = True
+        else:
             raise HTTPException(
                 status_code=404,
                 detail="No game predictions found. Train models first."
@@ -313,6 +316,8 @@ async def game_stats(team_code: str = Query(default="BOS")):
         "home_games_count": len(home_games),
         "away_games_count": len(away_games),
         "recent_games": recent_games,
+        "used_fallback": used_fallback,
+        "team_code": team_code,
     }
 
 
