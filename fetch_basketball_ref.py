@@ -140,13 +140,29 @@ def fetch_team_season(
     # Fetch with rate limiting
     time.sleep(REQUEST_DELAY)
 
+    # Rotate User-Agent to avoid IP-level rate limits
+    user_agents = [
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+    ]
+    import random
     headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": random.choice(user_agents),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.5",
     }
 
     response = requests.get(url, headers=headers, timeout=30)
+    # Retry up to 3 times on server errors with exponential backoff
+    retries = 0
+    max_retries = 3
+    while response.status_code >= 500 and retries < max_retries:
+        retries += 1
+        wait_time = (2 ** retries) + REQUEST_DELAY
+        logger.warning(f"Server error {response.status_code} for {team_code}/{season_year}, retry {retries}/{max_retries} in {wait_time:.1f}s")
+        time.sleep(wait_time)
+        response = requests.get(url, headers=headers, timeout=30)
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "lxml")
