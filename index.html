@@ -953,6 +953,23 @@
                 </div>
             </div>
         </div>
+
+        <!-- Insights Section -->
+        <div class="card" id="insightsCard">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-icon">💡</span>
+                    Model Insights
+                    <span id="insightsTeam" class="text-xs font-normal ml-2 text-gray-500"></span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="insightsLoading" class="text-center py-4 text-gray-500">
+                    <span id="insightsEmpty">Train a model to see insights</span>
+                </div>
+                <div id="insightsList" class="space-y-2" style="display:none;"></div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -1275,6 +1292,11 @@
                 const testAcc = typeof data.test_accuracy === 'number' ? data.test_accuracy.toFixed(1) + '%' : '--';
                 trainText.textContent = `✓ ${selectedTeam} trained! ${data.total_games} games | Train: ${acc} | Test: ${testAcc}`;
 
+                // Store and render insights
+                window._teamInsights = window._teamInsights || {};
+                window._teamInsights[selectedTeam] = data.insights || [];
+                renderInsights(selectedTeam);
+
                 // Refresh game stats for this team
                 loadGameStats(selectedTeam);
 
@@ -1285,6 +1307,62 @@
             } finally {
                 trainBtn.disabled = false;
             }
+        }
+
+        function renderInsights(team) {
+            const insights = (window._teamInsights || {})[team] || [];
+            const listEl = document.getElementById('insightsList');
+            const emptyEl = document.getElementById('insightsEmpty');
+            const teamEl = document.getElementById('insightsTeam');
+
+            if (!listEl) return;
+            teamEl.textContent = team ? `(${team})` : '';
+
+            if (insights.length === 0) {
+                listEl.style.display = 'none';
+                if (emptyEl) emptyEl.textContent = 'Train a model to see insights';
+                return;
+            }
+
+            // Separate baseline from rules
+            const rules = insights.filter(i => i.type === 'rule');
+            const baselines = insights.filter(i => i.type === 'baseline');
+
+            let html = '';
+
+            if (baselines.length > 0) {
+                baselines.forEach(b => {
+                    html += `<div class="insight-rule" style="border-color:rgba(59,130,246,0.2)">
+                        <span class="insight-symbol">📊</span>
+                        <div>
+                            <div class="insight-text">${b.description}</div>
+                        </div>
+                    </div>`;
+                });
+            }
+
+            rules.forEach(insight => {
+                const isPositive = insight.direction === 'higher';
+                const symbol = isPositive ? '↑' : '↓';
+                const strengthColor = insight.strength === 'strong' ? 'strong' : '';
+                html += `<div class="insight-rule ${isPositive ? 'positive' : 'negative'}">
+                    <span class="insight-symbol">${symbol}</span>
+                    <div>
+                        <div class="insight-text">${insight.description}</div>
+                        <div class="insight-meta">
+                            <span class="insight-badge ${insight.location}">${insight.location}</span>
+                            <span class="insight-badge ${strengthColor}">${insight.strength}</span>
+                            <span class="insight-badge">±${insight.probChange}%</span>
+                        </div>
+                    </div>
+                </div>`;
+            });
+
+            listEl.innerHTML = html;
+            listEl.style.display = 'flex';
+            listEl.style.flexDirection = 'column';
+            listEl.style.gap = '8px';
+            if (emptyEl) emptyEl.textContent = '';
         }
 
         document.getElementById('trainBtn').addEventListener('click', trainModel);

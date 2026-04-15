@@ -20,6 +20,94 @@ from data_loader import (
 MODELS_DIR = os.environ.get("MODELS_DIR", "models")
 
 
+def extract_insights(model_home, model_away, df, feature_cols):
+    """
+    Extract human-readable insights from trained logistic regression models.
+    Returns a list of insight dicts with type, label, direction, and description.
+    """
+    insights = []
+
+    for location, model in [("home", model_home), ("away", model_away)]:
+        if model is None:
+            continue
+
+        coef = dict(zip(feature_cols, model.coef_[0]))
+        medians = df[feature_cols].median()
+
+        for feat, coeff in coef.items():
+            if abs(coeff) < 0.01:
+                continue
+
+            # Determine direction label
+            if coeff > 0:
+                direction = "higher"
+                symbol = "↑"
+            else:
+                direction = "lower"
+                symbol = "↓"
+
+            # Short readable names
+            feat_names = {
+                "pace": "Pace",
+                "ftr": "Free Throw Rate",
+                "efg_pct": "Effective FG%",
+                "tov_pct": "Turnover %",
+                "orb_pct": "Offensive Rebound %",
+            }
+            label = feat_names.get(feat, feat)
+
+            # Quantify the effect: for a 1-SD change in this feature,
+            # how much does win probability change?
+            sd = df[feat].std()
+            prob_change = abs(coeff) * sd
+            prob_pct = prob_change * 100
+
+            # Describe the typical range
+            typical_low = round(medians[feat] - sd, 3)
+            typical_high = round(medians[feat] + sd, 3)
+
+            if prob_pct > 5:
+                strength = "strong"
+            elif prob_pct > 2:
+                strength = "moderate"
+            else:
+                strength = "mild"
+
+            insights.append({
+                "type": "rule",
+                "location": location,
+                "feature": feat,
+                "label": label,
+                "direction": direction,
+                "symbol": symbol,
+                "strength": strength,
+                "probChange": round(prob_pct, 1),
+                "typicalRange": f"{typical_low}–{typical_high}",
+                "description": (
+                    f"{symbol} {label}: {strength} effect on win probability "
+                    f"(±{prob_pct:.1f}% for 1-SD change). "
+                    f"Typical range: {typical_low}–{typical_high}."
+                ),
+            })
+
+    # Add overall model intercept insight
+    for location, model in [("home", model_home), ("away", model_away)]:
+        if model is None:
+            continue
+        base_win_prob = 1 / (1 + abs(model.intercept_[0]))
+        insights.append({
+            "type": "baseline",
+            "location": location,
+            "baseWinProb": round(base_win_prob * 100, 1),
+            "description": (
+                f"{location.title()} win probability when all factors are at median: "
+                f"{round(base_win_prob * 100, 1)}%"
+            ),
+        })
+
+    return insights
+
+
 def train_models(
     team_code: str = "BOS",
     season_year: Optional[int] = None,

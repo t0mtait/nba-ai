@@ -309,6 +309,17 @@ async def game_stats(team_code: str = Query(default="BOS")):
     recent_games = recent_games.where(pd.notna(recent_games), None)
     recent_games = recent_games.to_dict("records")
 
+    # Load saved insights for this team
+    insights = []
+    insights_path = os.path.join(MODELS_DIR, f"{team_code}_insights.json")
+    if os.path.exists(insights_path):
+        try:
+            with open(insights_path) as f:
+                insights_data = json.load(f)
+                insights = insights_data.get("insights", [])
+        except Exception:
+            pass
+
     return {
         "overall_accuracy": float(overall_accuracy),
         "home_accuracy": float(home_accuracy),
@@ -319,6 +330,7 @@ async def game_stats(team_code: str = Query(default="BOS")):
         "recent_games": recent_games,
         "used_fallback": used_fallback,
         "team_code": team_code,
+        "insights": insights,
     }
 
 
