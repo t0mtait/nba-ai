@@ -1189,10 +1189,13 @@
                 }
 
                 const data = await resp.json();
-                statusText.textContent = `✓ Fetched ${data.total_games_fetched} games (${data.seasons.length} seasons)`;
+                const failedText = data.failed_years && data.failed_years.length > 0
+                    ? ` (${data.failed_years.length} years unavailable: ${data.failed_years.join(', ')})`
+                    : '';
+                statusText.textContent = `✓ Fetched ${data.total_games_fetched} games (${data.seasons.length} seasons)${failedText}`;
                 statusDot.classList.remove('loading');
                 statusDot.classList.add('active');
-                loadGameStats();
+                loadGameStats(selectedTeam);
 
             } catch (err) {
                 statusText.textContent = '✗ ' + err.message;

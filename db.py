@@ -318,7 +318,7 @@ def fetch_team_games(
     init_db(db_path)
 
     # Fetch games
-    all_games = fetch_multiple_years(team_code, start_year, end_year, force_refresh=force_refresh)
+    all_games, failed_years = fetch_multiple_years(team_code, start_year, end_year, force_refresh=force_refresh)
 
     # Group by season year and save
     by_season: dict[int, list[dict]] = {}
@@ -351,6 +351,7 @@ def fetch_team_games(
         "total_games_saved": total_saved,
         "seasons_fetched": len(by_season),
         "seasons": sorted(by_season.keys()),
+        "failed_years": sorted(failed_years),
     }
 
 

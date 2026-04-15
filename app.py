@@ -197,6 +197,7 @@ async def fetch_team_games(
             "total_games_fetched": result["total_games_fetched"],
             "total_games_saved": result["total_games_saved"],
             "seasons": result["seasons"],
+            "failed_years": result.get("failed_years", []),
         }
     except Exception as e:
         logger.error(f"Error fetching games for {team_code}: {e}")

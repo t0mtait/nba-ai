@@ -459,7 +459,7 @@ def fetch_multiple_years(
     start_year: int,
     end_year: int,
     force_refresh: bool = False,
-) -> list[dict]:
+) -> tuple[list[dict], list[int]]:
     """
     Fetch game data for multiple seasons.
 
@@ -470,9 +470,10 @@ def fetch_multiple_years(
         force_refresh: If True, bypass cache
 
     Returns:
-        Combined list of all games from all seasons
+        Tuple of (combined list of all games, list of years that failed)
     """
     all_games = []
+    failed_years = []
 
     for year in range(start_year, end_year + 1):
         try:
@@ -480,9 +481,10 @@ def fetch_multiple_years(
             all_games.extend(games)
             logger.info(f"Fetched {len(games)} games for {team_code}/{year}")
         except Exception as e:
+            failed_years.append(year)
             logger.error(f"Error fetching {team_code}/{year}: {e}")
 
-    return all_games
+    return all_games, failed_years
 
 
 if __name__ == "__main__":
