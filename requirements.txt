@@ -6,3 +6,6 @@ uvicorn==0.30.0
 starlette==0.38.0
 anyio==3.7.1
 pydantic==2.9.0
+requests
+beautifulsoup4
+lxml

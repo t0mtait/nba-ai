@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Celtics Win Predictor</title>
+    <title>NBA Win Predictor</title>
     <style>
         * {
             margin: 0;
@@ -11,11 +11,26 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --bg-primary: #0b0c0e;
+            --bg-secondary: rgba(14, 16, 19, 0.92);
+            --bg-input: rgba(255, 255, 255, 0.06);
+            --border-color: rgba(255, 255, 255, 0.06);
+            --border-active: rgba(95, 208, 104, 0.9);
+            --text-primary: #e6e6e6;
+            --text-secondary: #9aa0a6;
+            --text-muted: #6b7280;
+            --accent-green: #4CAF50;
+            --accent-green-light: #5fd068;
+            --accent-red: #f44336;
+            --accent-red-dark: #da190b;
+        }
+
         body {
             font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
             background: radial-gradient(1200px 800px at 20% 0%, #121416 0%, #0b0c0e 40%, #08090b 100%);
             min-height: 100vh;
-            color: #e6e6e6;
+            color: var(--text-primary);
             padding: 16px;
             letter-spacing: 0.2px;
         }
@@ -37,15 +52,73 @@
             letter-spacing: 0.3px;
         }
 
-        h1 .gradient-text {
+        .gradient-text {
             background: linear-gradient(135deg, #4CAF50, #45a049);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         .subtitle {
-            color: #9aa0a6;
+            color: var(--text-secondary);
             font-size: 0.85em;
+        }
+
+        /* Team Selector */
+        .team-selector {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .team-selector label {
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .team-select {
+            padding: 8px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.95em;
+            min-width: 200px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .team-select:focus {
+            outline: none;
+            border-color: var(--border-active);
+            box-shadow: 0 0 10px rgba(95, 208, 104, 0.2);
+        }
+
+        .fetch-btn {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .fetch-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .fetch-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
 
         .main-grid {
@@ -57,47 +130,75 @@
 
         @media (min-width: 1400px) {
             .main-grid {
-                grid-template-columns: 1fr;
                 gap: 18px;
             }
         }
 
-        @media (max-width: 1024px) {
-            .main-grid {
+        .card {
+            background: var(--bg-secondary);
+            border-radius: 14px;
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+            padding: 16px;
+        }
+
+        @media (min-width: 1400px) {
+            .card {
+                padding: 18px;
+            }
+        }
+
+        .card h2 {
+            font-size: 1.05em;
+            margin-bottom: 10px;
+            color: var(--accent-green);
+            letter-spacing: 0.3px;
+        }
+
+        /* Stats Card */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
                 grid-template-columns: 1fr;
             }
         }
 
-        .stats-card {
-            grid-column: 1 / -1;
+        .stat-box {
+            background: rgba(76, 175, 80, 0.1);
+            border: 2px solid rgba(76, 175, 80, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
         }
 
-        .stats-card .card h2 {
-            display: none;
+        .stat-value {
+            font-size: 1.7em;
+            font-weight: bold;
+            color: var(--accent-green);
+            margin-bottom: 3px;
         }
 
-        .stats-card .stats-grid {
-            margin-bottom: 0;
+        .stat-label {
+            font-size: 0.8em;
+            color: var(--text-secondary);
         }
 
-        @media (min-width: 1400px) {
-            .stats-card .stats-grid {
-                gap: 8px;
-            }
-
-            .stats-card .stat-box {
-                padding: 10px;
-            }
-
-            .stats-card .stat-value {
-                font-size: 1.4em;
-            }
-
-            .stats-card .stat-label {
-                font-size: 0.7em;
-            }
+        /* Last Updated */
+        .last-updated {
+            text-align: center;
+            font-size: 0.8em;
+            color: var(--text-muted);
+            margin-bottom: 10px;
         }
 
+        /* Form */
         .form-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -116,28 +217,6 @@
             }
         }
 
-        .card {
-            background: rgba(14, 16, 19, 0.92);
-            border-radius: 14px;
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
-            padding: 16px;
-        }
-
-        @media (min-width: 1400px) {
-            .card {
-                padding: 18px;
-            }
-        }
-
-        .card h2 {
-            font-size: 1.05em;
-            margin-bottom: 10px;
-            color: #7ddc8c;
-            letter-spacing: 0.3px;
-        }
-
         .form-group {
             margin-bottom: 10px;
         }
@@ -147,30 +226,13 @@
             margin-bottom: 4px;
             font-weight: 500;
             font-size: 0.78em;
-            color: #cfd3d7;
-        }
-
-        @media (min-width: 1400px) {
-            .form-group {
-                margin-bottom: 10px;
-            }
-
-            label {
-                margin-bottom: 3px;
-                font-size: 0.8em;
-            }
+            color: var(--text-secondary);
         }
 
         .location-selector {
             display: flex;
             gap: 8px;
-            margin-bottom: 10px;
-        }
-
-        @media (min-width: 1400px) {
-            .location-selector {
-                margin-bottom: 10px;
-            }
+            margin-bottom: 14px;
         }
 
         .location-btn {
@@ -178,7 +240,7 @@
             padding: 10px 16px;
             border: 1px solid rgba(255, 255, 255, 0.12);
             background: rgba(255, 255, 255, 0.04);
-            color: #e6e6e6;
+            color: var(--text-primary);
             border-radius: 9px;
             cursor: pointer;
             font-size: 0.95em;
@@ -187,7 +249,7 @@
         }
 
         .location-btn.active {
-            background: linear-gradient(135deg, #5fd068, #3bbf5a);
+            background: linear-gradient(135deg, var(--accent-green-light), var(--accent-green));
             border-color: rgba(95, 208, 104, 0.7);
             box-shadow: 0 0 16px rgba(95, 208, 104, 0.35);
         }
@@ -200,55 +262,49 @@
         input[type="number"] {
             width: 100%;
             padding: 9px 10px;
-            background: rgba(255, 255, 255, 0.06);
+            background: var(--bg-input);
             border: 1px solid rgba(255, 255, 255, 0.14);
             border-radius: 8px;
-            color: #f2f2f2;
+            color: var(--text-primary);
             font-size: 0.9em;
             transition: all 0.2s ease;
-        }
-
-        @media (min-width: 1400px) {
-            input[type="number"] {
-                padding: 8px 10px;
-                font-size: 0.9em;
-            }
         }
 
         input[type="number"]:focus {
             outline: none;
             background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(95, 208, 104, 0.9);
+            border-color: var(--border-active);
             box-shadow: 0 0 10px rgba(95, 208, 104, 0.2);
         }
 
-        button {
-            width: 100%;
-            padding: 10px;
-            background: linear-gradient(135deg, #5fd068, #3bbf5a);
-            color: #0b120c;
-            border: none;
-            border-radius: 8px;
-            font-size: 0.95em;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            margin-top: 6px;
+        input[type="number"]::placeholder {
+            color: var(--text-muted);
         }
 
-        @media (min-width: 1400px) {
-            button {
-                padding: 10px;
-                font-size: 0.95em;
-                margin-top: 6px;
-            }
+        /* Live prediction indicator */
+        .live-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75em;
+            color: var(--text-muted);
+            margin-left: 8px;
         }
 
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(76, 175, 80, 0.4);
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            animation: pulse 2s infinite;
         }
 
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* Result */
         .result {
             margin-top: 20px;
             padding: 18px;
@@ -256,13 +312,6 @@
             border: 2px solid rgba(76, 175, 80, 0.3);
             border-radius: 12px;
             display: none;
-        }
-
-        @media (min-width: 1400px) {
-            .result {
-                margin-top: 15px;
-                padding: 15px;
-            }
         }
 
         .result.show {
@@ -291,12 +340,12 @@
         }
 
         .win {
-            color: #4CAF50;
+            color: var(--accent-green);
             font-weight: bold;
         }
 
         .loss {
-            color: #f44336;
+            color: var(--accent-red);
             font-weight: bold;
         }
 
@@ -308,24 +357,11 @@
             margin-bottom: 10px;
         }
 
-        @media (min-width: 1400px) {
-            .prob-item {
-                margin-bottom: 8px;
-            }
-        }
-
         .prob-label {
             display: flex;
             justify-content: space-between;
             margin-bottom: 5px;
             font-size: 0.9em;
-        }
-
-        @media (min-width: 1400px) {
-            .prob-label {
-                margin-bottom: 3px;
-                font-size: 0.8em;
-            }
         }
 
         .prob-bar {
@@ -335,15 +371,9 @@
             overflow: hidden;
         }
 
-        @media (min-width: 1400px) {
-            .prob-bar {
-                height: 20px;
-            }
-        }
-
         .prob-fill {
             height: 100%;
-            background: linear-gradient(90deg, #4CAF50, #45a049);
+            background: linear-gradient(90deg, var(--accent-green), #45a049);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -353,65 +383,7 @@
             transition: width 0.5s ease;
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 18px;
-        }
-
-        @media (min-width: 1400px) {
-            .stats-grid {
-                gap: 10px;
-                margin-bottom: 15px;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .stat-box {
-            background: rgba(76, 175, 80, 0.1);
-            border: 2px solid rgba(76, 175, 80, 0.3);
-            border-radius: 10px;
-            padding: 15px;
-            text-align: center;
-        }
-
-        @media (min-width: 1400px) {
-            .stat-box {
-                padding: 12px;
-            }
-        }
-
-        .stat-value {
-            font-size: 1.7em;
-            font-weight: bold;
-            color: #4CAF50;
-            margin-bottom: 3px;
-        }
-
-        @media (min-width: 1400px) {
-            .stat-value {
-                font-size: 1.5em;
-                margin-bottom: 2px;
-            }
-        }
-
-        .stat-label {
-            font-size: 0.8em;
-            color: #aaa;
-        }
-
-        @media (min-width: 1400px) {
-            .stat-label {
-                font-size: 0.75em;
-            }
-        }
-
+        /* Games Table */
         .games-table {
             width: 100%;
             border-collapse: collapse;
@@ -427,7 +399,7 @@
             padding: 8px;
             text-align: left;
             font-weight: 600;
-            color: #4CAF50;
+            color: var(--accent-green);
             border-bottom: 2px solid rgba(76, 175, 80, 0.3);
             white-space: nowrap;
             font-size: 0.85em;
@@ -444,12 +416,12 @@
         }
 
         .correct {
-            color: #4CAF50;
+            color: var(--accent-green);
             font-weight: bold;
         }
 
         .incorrect {
-            color: #f44336;
+            color: var(--accent-red);
             font-weight: bold;
         }
 
@@ -458,16 +430,12 @@
             padding: 4px 8px;
             border-radius: 4px;
             background: rgba(76, 175, 80, 0.2);
-            color: #4CAF50;
+            color: var(--accent-green);
             font-size: 0.8em;
             font-weight: 600;
         }
 
-        .stat-number {
-            color: #aaa;
-            font-size: 0.85em;
-        }
-
+        /* Loading */
         .loading {
             display: none;
             text-align: center;
@@ -476,7 +444,7 @@
 
         .spinner {
             border: 3px solid rgba(255, 255, 255, 0.2);
-            border-top: 3px solid #4CAF50;
+            border-top: 3px solid var(--accent-green);
             border-radius: 50%;
             width: 30px;
             height: 30px;
@@ -489,12 +457,13 @@
             100% { transform: rotate(360deg); }
         }
 
+        /* Error */
         .error {
-            color: #f44336;
+            color: var(--accent-red);
             margin-top: 15px;
             padding: 12px;
             background: rgba(244, 67, 54, 0.1);
-            border-left: 3px solid #f44336;
+            border-left: 3px solid var(--accent-red);
             border-radius: 5px;
             display: none;
         }
@@ -502,18 +471,111 @@
         .error.show {
             display: block;
         }
+
+        /* Team Fetch Status */
+        .team-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8em;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        .team-status .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .team-status .dot.active {
+            background: var(--accent-green);
+        }
+
+        .team-status .dot.fetching {
+            background: #f59e0b;
+            animation: pulse 1s infinite;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.6em;
+            }
+
+            .team-selector {
+                flex-direction: column;
+            }
+
+            .team-select {
+                width: 100%;
+            }
+
+            .fetch-btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="wrapper">
         <header>
-            <h1>🏀 <span class="gradient-text">Celtic AI</span></h1>
-            <p class="subtitle">Win Prediction Model</p>
+            <h1>🏀 <span class="gradient-text">NBA Win Predictor</span></h1>
+            <p class="subtitle">Advanced Statistical Prediction Model</p>
         </header>
 
+        <!-- Team Selector -->
+        <div class="card" style="margin-bottom: 14px;">
+            <div class="team-selector">
+                <label for="teamSelect">Team:</label>
+                <select id="teamSelect" class="team-select">
+                    <option value="BOS">Boston Celtics</option>
+                    <option value="LAL">Los Angeles Lakers</option>
+                    <option value="GSW">Golden State Warriors</option>
+                    <option value="NYK">New York Knicks</option>
+                    <option value="MIA">Miami Heat</option>
+                    <option value="MIL">Milwaukee Bucks</option>
+                    <option value="PHI">Philadelphia 76ers</option>
+                    <option value="DEN">Denver Nuggets</option>
+                    <option value="DAL">Dallas Mavericks</option>
+                    <option value="PHO">Phoenix Suns</option>
+                    <option value="BKN">Brooklyn Nets</option>
+                    <option value="CHI">Chicago Bulls</option>
+                    <option value="CLE">Cleveland Cavaliers</option>
+                    <option value="LAC">Los Angeles Clippers</option>
+                    <option value="ATL">Atlanta Hawks</option>
+                    <option value="CHA">Charlotte Hornets</option>
+                    <option value="IND">Indiana Pacers</option>
+                    <option value="DET">Detroit Pistons</option>
+                    <option value="HOU">Houston Rockets</option>
+                    <option value="MEM">Memphis Grizzlies</option>
+                    <option value="MIN">Minnesota Timberwolves</option>
+                    <option value="NOP">New Orleans Pelicans</option>
+                    <option value="OKC">Oklahoma City Thunder</option>
+                    <option value="ORL">Orlando Magic</option>
+                    <option value="POR">Portland Trail Blazers</option>
+                    <option value="SAC">Sacramento Kings</option>
+                    <option value="SAS">San Antonio Spurs</option>
+                    <option value="TOR">Toronto Raptors</option>
+                    <option value="UTA">Utah Jazz</option>
+                    <option value="WAS">Washington Wizards</option>
+                </select>
+                <button id="fetchBtn" class="fetch-btn">
+                    <span>📥</span> Fetch Games
+                </button>
+            </div>
+            <div id="teamStatus" class="team-status" style="display: none;">
+                <span class="dot"></span>
+                <span id="teamStatusText"></span>
+            </div>
+        </div>
+
         <div class="main-grid">
-            <!-- Statistics Section (compact) -->
-            <div class="card stats-card">
+            <!-- Statistics Section -->
+            <div class="card">
+                <h2>Model Accuracy</h2>
                 <div class="stats-grid" id="statsGrid">
                     <div class="stat-box">
                         <div class="stat-value">--</div>
@@ -528,6 +590,7 @@
                         <div class="stat-label">Away Accuracy</div>
                     </div>
                 </div>
+                <div class="last-updated" id="lastUpdated"></div>
                 <div class="loading" id="statsLoading">
                     <div class="spinner"></div>
                 </div>
@@ -536,7 +599,13 @@
 
             <!-- Prediction Form Section -->
             <div class="card">
-                <h2>Make a Prediction</h2>
+                <h2>
+                    Make a Prediction
+                    <span class="live-indicator">
+                        <span class="live-dot"></span>
+                        Live
+                    </span>
+                </h2>
 
                 <div class="location-selector">
                     <button class="location-btn active" data-location="home">Home Game</button>
@@ -547,31 +616,29 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="pace">Pace</label>
-                            <input type="number" id="pace" name="pace" step="0.1" min="0" placeholder="96.5" required>
+                            <input type="number" id="pace" name="pace" step="0.1" min="0" placeholder="96.5">
                         </div>
 
                         <div class="form-group">
                             <label for="ftr">Free Throw Rate (FTr)</label>
-                            <input type="number" id="ftr" name="ftr" step="0.001" min="0" max="1" placeholder="0.23" required>
+                            <input type="number" id="ftr" name="ftr" step="0.001" min="0" max="1" placeholder="0.23">
                         </div>
 
                         <div class="form-group">
                             <label for="efg_pct">Effective FG% (eFG%)</label>
-                            <input type="number" id="efg_pct" name="efg_pct" step="0.001" min="0" max="1" placeholder="0.54" required>
+                            <input type="number" id="efg_pct" name="efg_pct" step="0.001" min="0" max="1" placeholder="0.54">
                         </div>
 
                         <div class="form-group">
                             <label for="tov_pct">Turnover % (TOV%)</label>
-                            <input type="number" id="tov_pct" name="tov_pct" step="0.001" min="0" max="1" placeholder="0.14" required>
+                            <input type="number" id="tov_pct" name="tov_pct" step="0.001" min="0" max="1" placeholder="0.14">
                         </div>
 
                         <div class="form-group">
                             <label for="orb_pct">Offensive Rebound % (ORB%)</label>
-                            <input type="number" id="orb_pct" name="orb_pct" step="0.001" min="0" max="1" placeholder="0.23" required>
+                            <input type="number" id="orb_pct" name="orb_pct" step="0.001" min="0" max="1" placeholder="0.23">
                         </div>
                     </div>
-
-                    <button type="submit">Predict Win</button>
                 </form>
 
                 <div class="loading" id="loading">
@@ -639,7 +706,51 @@
     </div>
 
     <script>
+        // State
         let selectedLocation = "home";
+        let selectedTeam = "BOS";
+        let debounceTimer = null;
+        let lastPrediction = null;
+
+        // Team names mapping
+        const teamNames = {
+            "BOS": "Boston Celtics",
+            "LAL": "Los Angeles Lakers",
+            "GSW": "Golden State Warriors",
+            "NYK": "New York Knicks",
+            "MIA": "Miami Heat",
+            "MIL": "Milwaukee Bucks",
+            "PHI": "Philadelphia 76ers",
+            "DEN": "Denver Nuggets",
+            "DAL": "Dallas Mavericks",
+            "PHO": "Phoenix Suns",
+            "BKN": "Brooklyn Nets",
+            "CHI": "Chicago Bulls",
+            "CLE": "Cleveland Cavaliers",
+            "LAC": "Los Angeles Clippers",
+            "ATL": "Atlanta Hawks",
+            "CHA": "Charlotte Hornets",
+            "IND": "Indiana Pacers",
+            "DET": "Detroit Pistons",
+            "HOU": "Houston Rockets",
+            "MEM": "Memphis Grizzlies",
+            "MIN": "Minnesota Timberwolves",
+            "NOP": "New Orleans Pelicans",
+            "OKC": "Oklahoma City Thunder",
+            "ORL": "Orlando Magic",
+            "POR": "Portland Trail Blazers",
+            "SAC": "Sacramento Kings",
+            "SAS": "San Antonio Spurs",
+            "TOR": "Toronto Raptors",
+            "UTA": "Utah Jazz",
+            "WAS": "Washington Wizards",
+        };
+
+        // Team selector
+        document.getElementById("teamSelect").addEventListener("change", (e) => {
+            selectedTeam = e.target.value;
+            loadGameStats();
+        });
 
         // Location selector
         document.querySelectorAll(".location-btn").forEach(btn => {
@@ -647,6 +758,18 @@
                 document.querySelectorAll(".location-btn").forEach(b => b.classList.remove("active"));
                 e.target.classList.add("active");
                 selectedLocation = e.target.dataset.location;
+                triggerPrediction();
+            });
+        });
+
+        // Fetch button
+        document.getElementById("fetchBtn").addEventListener("click", fetchTeamGames);
+
+        // Form input listeners for live prediction
+        const predictionInputs = ["pace", "ftr", "efg_pct", "tov_pct", "orb_pct"];
+        predictionInputs.forEach(inputId => {
+            document.getElementById(inputId).addEventListener("input", () => {
+                triggerPrediction();
             });
         });
 
@@ -657,16 +780,31 @@
             const statsLoading = document.getElementById("statsLoading");
             const statsError = document.getElementById("statsError");
             const statBoxes = document.querySelectorAll(".stat-box");
+            const lastUpdated = document.getElementById("lastUpdated");
 
             statsLoading.style.display = "block";
             statsError.classList.remove("show");
 
             try {
                 const response = await fetch("/game-stats");
-                if (!response.ok) throw new Error("Failed to load game statistics");
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        // No predictions yet
+                        statBoxes.forEach(box => {
+                            box.innerHTML = `
+                                <div class="stat-value">--</div>
+                                <div class="stat-label">Train models first</div>
+                            `;
+                        });
+                        lastUpdated.textContent = "";
+                        updateGamesTable([]);
+                        return;
+                    }
+                    throw new Error("Failed to load game statistics");
+                }
+
                 const data = await response.json();
 
-                // Update stat boxes with game counts in parentheses
                 statBoxes[0].innerHTML = `
                     <div class="stat-value">${data.overall_accuracy.toFixed(1)}%</div>
                     <div class="stat-label">Overall Accuracy (n=${data.total_games})</div>
@@ -680,13 +818,15 @@
                     <div class="stat-label">Away Accuracy (n=${data.away_games_count})</div>
                 `;
 
-                // Update games table
-                populateGamesTable(data.recent_games);
+                if (data.total_games > 0) {
+                    lastUpdated.textContent = `Based on ${data.total_games} games`;
+                }
+
+                updateGamesTable(data.recent_games || []);
             } catch (err) {
                 console.error("Error loading game stats:", err);
-                statsError.textContent = "Failed to load statistics. Please refresh the page.";
+                statsError.textContent = "Failed to load statistics: " + err.message;
                 statsError.classList.add("show");
-                // Show placeholder values
                 statBoxes.forEach(box => {
                     box.innerHTML = `
                         <div class="stat-value">--</div>
@@ -698,12 +838,12 @@
             }
         }
 
-        function populateGamesTable(games) {
+        function updateGamesTable(games) {
             const tbody = document.getElementById("gamesTableBody");
             tbody.innerHTML = "";
 
             if (games.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; color: #aaa;">No games found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; color: #aaa;">No games found. Fetch data or train models.</td></tr>';
                 return;
             }
 
@@ -722,7 +862,6 @@
                 const actualText = game.actual ? "W" : "L";
                 const locationBadge = game.location === "home" ? "H" : "A";
 
-                // Format date with year
                 const dateStr = game.date
                     ? new Date(game.date + "T00:00:00Z").toLocaleDateString("en-US", {
                         month: "short",
@@ -751,26 +890,36 @@
             });
         }
 
-        // Form submission
-        document.getElementById("predictionForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
+        function triggerPrediction() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(makePrediction, 300);
+        }
 
+        async function makePrediction() {
             const loading = document.getElementById("loading");
             const error = document.getElementById("error");
             const result = document.getElementById("result");
 
-            loading.style.display = "block";
-            error.classList.remove("show");
-            result.classList.remove("show");
-
+            // Check if all required fields have values
             const formData = {
+                team_code: selectedTeam,
                 location: selectedLocation,
                 pace: parseFloat(document.getElementById("pace").value),
                 ftr: parseFloat(document.getElementById("ftr").value),
                 efg_pct: parseFloat(document.getElementById("efg_pct").value),
                 tov_pct: parseFloat(document.getElementById("tov_pct").value),
-                orb_pct: parseFloat(document.getElementById("orb_pct").value)
+                orb_pct: parseFloat(document.getElementById("orb_pct").value),
             };
+
+            // Validate
+            const hasAllValues = Object.values(formData).every(v => !isNaN(v) && v !== "");
+            if (!hasAllValues) {
+                result.classList.remove("show");
+                return;
+            }
+
+            error.classList.remove("show");
+            loading.style.display = "block";
 
             try {
                 const response = await fetch("/predict", {
@@ -779,17 +928,23 @@
                     body: JSON.stringify(formData)
                 });
 
-                if (!response.ok) throw new Error("Prediction failed");
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.detail || "Prediction failed");
+                }
 
                 const data = await response.json();
+                lastPrediction = data;
                 displayResult(data);
             } catch (err) {
+                console.error("Prediction error:", err);
                 error.textContent = "Error: " + err.message;
                 error.classList.add("show");
+                result.classList.remove("show");
             } finally {
                 loading.style.display = "none";
             }
-        });
+        }
 
         function displayResult(data) {
             const result = document.getElementById("result");
@@ -802,21 +957,79 @@
             const winProbPercent = (data.win_probability * 100).toFixed(1);
             const lossProbPercent = (data.loss_probability * 100).toFixed(1);
 
+            const teamName = teamNames[data.team_code] || data.team_code;
             outcome.innerHTML = data.win_prediction
-                ? '<span class="win">✓ Celtics WIN</span>'
-                : '<span class="loss">✗ Celtics LOSS</span>';
+                ? `<span class="win">✓ ${teamName} WIN</span>`
+                : `<span class="loss">✗ ${teamName} LOSS</span>`;
 
             winProb.textContent = winProbPercent + "%";
             lossProb.textContent = lossProbPercent + "%";
 
+            // Reset bars
+            winBar.style.width = "0%";
+            winBar.textContent = "";
+            lossBar.style.width = "0%";
+            lossBar.textContent = "";
+
+            // Animate bars
             setTimeout(() => {
                 winBar.style.width = winProbPercent + "%";
                 winBar.textContent = winProbPercent + "%";
                 lossBar.style.width = lossProbPercent + "%";
                 lossBar.textContent = lossProbPercent + "%";
-            }, 100);
+            }, 50);
 
             result.classList.add("show");
+        }
+
+        async function fetchTeamGames() {
+            const fetchBtn = document.getElementById("fetchBtn");
+            const teamStatus = document.getElementById("teamStatus");
+            const teamStatusText = document.getElementById("teamStatusText");
+            const error = document.getElementById("error");
+
+            error.classList.remove("show");
+            teamStatus.style.display = "flex";
+            teamStatusText.textContent = "Fetching games...";
+            teamStatus.querySelector(".dot").classList.add("fetching");
+            teamStatus.querySelector(".dot").classList.remove("active");
+            fetchBtn.disabled = true;
+
+            try {
+                const response = await fetch(`/teams/${selectedTeam}/fetch`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        start_year: 2017,
+                        end_year: 2026,
+                        force_refresh: false
+                    })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.detail || "Fetch failed");
+                }
+
+                const data = await response.json();
+
+                teamStatusText.textContent = `✓ Fetched ${data.total_games_fetched} games (${data.seasons.length} seasons)`;
+                teamStatus.querySelector(".dot").classList.remove("fetching");
+                teamStatus.querySelector(".dot").classList.add("active");
+
+                // Reload stats
+                loadGameStats();
+
+            } catch (err) {
+                console.error("Fetch error:", err);
+                teamStatusText.textContent = "✗ " + err.message;
+                teamStatus.querySelector(".dot").classList.remove("fetching");
+                teamStatus.querySelector(".dot").classList.add("active");
+                error.textContent = "Fetch failed: " + err.message;
+                error.classList.add("show");
+            } finally {
+                fetchBtn.disabled = false;
+            }
         }
     </script>
 </body>

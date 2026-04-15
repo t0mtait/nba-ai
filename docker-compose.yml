@@ -7,8 +7,11 @@ services:
       - ./data:/app/data
       - ./models:/app/models
       - ./uploaded_games:/app/uploaded_games
+      - ./nba_games.db:/app/nba_games.db
+      - ./.cache:/app/.cache
     environment:
       - PYTHONUNBUFFERED=1
+      - DATABASE_PATH=/app/nba_games.db
     restart: unless-stopped
     deploy:
       resources:

@@ -13,9 +13,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application files
 COPY app.py .
 COPY data_loader.py .
+COPY db.py .
+COPY fetch_basketball_ref.py .
+COPY train_models.py .
 COPY index.html .
 COPY models/ ./models/
 COPY data/ ./data/
+
+# Create cache directory
+RUN mkdir -p /app/.cache
 
 # Expose port
 EXPOSE 8000

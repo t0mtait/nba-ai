@@ -1,29 +1,52 @@
 """FastAPI backend for Celtics win prediction."""
-import os
+from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
+import os
+import logging
+from typing import Optional
+
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 import pandas as pd
-
 import pickle
 
-app = FastAPI()
+import db
+from data_loader import load_games_from_db, FEATURE_COLUMNS
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(
+    title="NBA Win Prediction API",
+    description="Predict NBA game outcomes using advanced statistics",
+)
+
+# CORS for local development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Model and data paths
 MODELS_DIR = os.environ.get("MODELS_DIR", "models")
+DATABASE_PATH = os.environ.get("DATABASE_PATH", os.path.join(os.path.dirname(__file__), "nba_games.db"))
 
-# Global model containers (loaded lazily to allow health checks even if models are missing)
+# Global model containers
 _model_home = None
 _model_away = None
 _feature_cols = None
-_game_predictions = None
 _load_error = None
 
 
 def _load_models():
     """Load models and game predictions from disk."""
-    global _model_home, _model_away, _feature_cols, _game_predictions, _load_error
+    global _model_home, _model_away, _feature_cols, _load_error
     if _load_error is not None:
         raise _load_error
 
@@ -34,7 +57,6 @@ def _load_models():
             _model_away = pickle.load(f)
         with open(os.path.join(MODELS_DIR, "feature_cols.pkl"), "rb") as f:
             _feature_cols = pickle.load(f)
-        _game_predictions = pd.read_csv(os.path.join(MODELS_DIR, "game_predictions.csv"))
         _load_error = None
     except FileNotFoundError as e:
         _load_error = RuntimeError(f"Model file not found: {e}. Run train_models.py first.")
@@ -62,20 +84,19 @@ def _get_feature_cols():
     return _feature_cols
 
 
-def _get_game_predictions():
-    global _game_predictions
-    if _game_predictions is None:
-        _load_models()
-    return _game_predictions
-
-
 class PredictionRequest(BaseModel):
+    team_code: str = Field(default="BOS", description="Team code (e.g., BOS, LAL)")
     location: str  # "home" or "away"
     pace: float = Field(..., ge=0, le=200, description="Game pace (typical NBA range: 85-105)")
     ftr: float = Field(..., ge=0, le=1, description="Free Throw Rate (0-1)")
     efg_pct: float = Field(..., ge=0, le=1, description="Effective FG% (0-1)")
     tov_pct: float = Field(..., ge=0, le=1, description="Turnover % (0-1)")
     orb_pct: float = Field(..., ge=0, le=1, description="Offensive Rebound % (0-1)")
+
+    @field_validator("team_code")
+    @classmethod
+    def validate_team_code(cls, v: str) -> str:
+        return v.upper()
 
     @field_validator("location")
     @classmethod
@@ -84,6 +105,25 @@ class PredictionRequest(BaseModel):
             raise ValueError("location must be 'home' or 'away'")
         return v.lower()
 
+
+class FetchRequest(BaseModel):
+    start_year: int = Field(default=2017, ge=2000, le=2030)
+    end_year: int = Field(default=2026, ge=2000, le=2030)
+    force_refresh: bool = Field(default=False)
+
+
+class TeamInfo(BaseModel):
+    code: str
+    name: str
+    fetched_games_count: int
+    games_in_db: int
+    wins: int
+    losses: int
+    win_pct: float
+    last_fetched: Optional[str]
+
+
+# ----- ROUTES -----
 
 @app.get("/")
 async def root():
@@ -95,54 +135,158 @@ async def health():
     """Health check endpoint - reports whether models are loaded."""
     try:
         _load_models()
-        return {"status": "healthy", "models_loaded": True}
+        return {
+            "status": "healthy",
+            "models_loaded": True,
+            "database": os.path.exists(DATABASE_PATH),
+        }
     except RuntimeError as e:
-        return {"status": "unhealthy", "models_loaded": False, "error": str(e)}
+        return {
+            "status": "unhealthy",
+            "models_loaded": False,
+            "error": str(e),
+            "database": os.path.exists(DATABASE_PATH),
+        }
+
+
+@app.get("/teams", response_model=list[dict])
+async def list_teams():
+    """List all teams in the database with their stats."""
+    try:
+        teams = db.get_teams()
+        return teams
+    except Exception as e:
+        logger.error(f"Error fetching teams: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/teams/{team_code}", response_model=dict)
+async def get_team(team_code: str):
+    """Get info for a specific team."""
+    team = db.get_team_info(team_code.upper())
+    if not team:
+        raise HTTPException(status_code=404, detail=f"Team {team_code} not found in database")
+    return team
+
+
+@app.post("/teams/{team_code}/fetch")
+async def fetch_team_games(
+    team_code: str,
+    request: FetchRequest,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Fetch games from basketball-reference.com for a team.
+
+    This runs in the background and returns immediately with a task ID.
+    """
+    from fetch_basketball_ref import NBA_TEAMS
+
+    team_code = team_code.upper()
+    if team_code not in NBA_TEAMS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown team code: {team_code}. Valid codes: {list(NBA_TEAMS.keys())}",
+        )
+
+    # Check if already being fetched (simple check)
+    team_info = db.get_team_info(team_code)
+    if team_info and team_info.get("last_fetched"):
+        # Already fetched, but allow re-fetch
+        pass
+
+    try:
+        # Fetch synchronously for now (could be made async)
+        result = db.fetch_team_games(
+            team_code=team_code,
+            start_year=request.start_year,
+            end_year=request.end_year,
+            force_refresh=request.force_refresh,
+        )
+
+        return {
+            "status": "complete",
+            "team": result["team"],
+            "team_name": result["team_name"],
+            "total_games_fetched": result["total_games_fetched"],
+            "total_games_saved": result["total_games_saved"],
+            "seasons": result["seasons"],
+        }
+    except Exception as e:
+        logger.error(f"Error fetching games for {team_code}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/teams/{team_code}/games")
+async def get_team_games(
+    team_code: str,
+    season_year: Optional[int] = None,
+    limit: Optional[int] = None,
+):
+    """Get games for a specific team."""
+    team_code = team_code.upper()
+
+    try:
+        games = db.get_games(team=team_code, season_year=season_year, limit=limit)
+        return {
+            "team": team_code,
+            "count": len(games),
+            "games": games,
+        }
+    except Exception as e:
+        logger.error(f"Error fetching games for {team_code}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/predict")
 async def predict(request: PredictionRequest):
-    """Predict Celtics win based on game stats."""
+    """Predict game outcome based on game stats."""
     try:
         feature_cols = _get_feature_cols()
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-    if request.location.lower() == "home":
+    location = request.location.lower()
+    if location == "home":
         model = _get_model_home()
-        cols = feature_cols["home"]
+        cols = feature_cols.get("home", FEATURE_COLUMNS)
     else:
         model = _get_model_away()
-        cols = feature_cols["away"]
+        cols = feature_cols.get("away", FEATURE_COLUMNS)
 
-    # Validate that request has all required feature columns
-    missing = [col for col in cols if not hasattr(request, col) or getattr(request, col) is None]
-    if missing:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Missing required fields for {request.location} model: {missing}"
-        )
-
-    features = pd.DataFrame([[getattr(request, col) for col in cols]], columns=cols)
+    # Build feature vector
+    features = pd.DataFrame([[
+        getattr(request, col, 0) for col in cols
+    ]], columns=cols)
 
     prediction = model.predict(features)[0]
     probability = model.predict_proba(features)[0]
 
     return {
+        "team_code": request.team_code,
         "location": request.location,
         "win_prediction": bool(prediction),
         "win_probability": float(probability[1]),
-        "loss_probability": float(probability[0])
+        "loss_probability": float(probability[0]),
     }
 
 
 @app.get("/game-stats")
 async def game_stats():
-    """Get game-by-game prediction statistics."""
+    """Get game-by-game prediction statistics from stored predictions."""
     try:
-        game_predictions = _get_game_predictions()
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        preds_path = os.path.join(MODELS_DIR, "game_predictions.csv")
+        if not os.path.exists(preds_path):
+            raise HTTPException(
+                status_code=404,
+                detail="No game predictions found. Train models first."
+            )
+
+        game_predictions = pd.read_csv(preds_path)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
     if game_predictions.empty:
         raise HTTPException(status_code=404, detail="No game predictions found")
@@ -150,18 +294,18 @@ async def game_stats():
     # Calculate overall stats
     home_games = game_predictions[game_predictions["location"] == "home"]
     away_games = game_predictions[game_predictions["location"] == "away"]
-    
+
     overall_accuracy = (game_predictions["correct"].sum() / len(game_predictions) * 100)
     home_accuracy = (home_games["correct"].sum() / len(home_games) * 100) if len(home_games) > 0 else 0
     away_accuracy = (away_games["correct"].sum() / len(away_games) * 100) if len(away_games) > 0 else 0
-    
+
     # Get recent games sorted by date (most recent first)
     recent_games = game_predictions.copy()
     recent_games["date"] = pd.to_datetime(recent_games["date"], errors="coerce")
     recent_games = recent_games.sort_values("date", ascending=False).head(20)
     recent_games["date"] = recent_games["date"].dt.strftime("%Y-%m-%d")
 
-    # Round float columns to avoid floating-point precision artifacts
+    # Round float columns
     float_cols = ["pace", "ftr", "efg_pct", "tov_pct", "orb_pct", "win_prob"]
     for col in float_cols:
         if col in recent_games.columns:
@@ -169,7 +313,7 @@ async def game_stats():
 
     recent_games = recent_games.where(pd.notna(recent_games), None)
     recent_games = recent_games.to_dict("records")
-    
+
     return {
         "overall_accuracy": float(overall_accuracy),
         "home_accuracy": float(home_accuracy),
@@ -177,8 +321,25 @@ async def game_stats():
         "total_games": len(game_predictions),
         "home_games_count": len(home_games),
         "away_games_count": len(away_games),
-        "recent_games": recent_games
+        "recent_games": recent_games,
     }
+
+
+@app.get("/db-stats")
+async def db_stats():
+    """Get statistics from the database."""
+    try:
+        teams = db.get_teams()
+        total_games = sum(t.get("games_in_db", 0) for t in teams)
+
+        return {
+            "total_teams": len(teams),
+            "total_games": total_games,
+            "teams": teams,
+        }
+    except Exception as e:
+        logger.error(f"Error fetching DB stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
