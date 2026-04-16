@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import json
 import logging
 from typing import Optional
 
@@ -121,13 +122,16 @@ async def root():
 async def health():
     """Health check endpoint - reports whether models are loaded."""
     try:
-        _load_models()
+        # Check that model files exist
+        model_home_path = os.path.join(MODELS_DIR, "model_home.pkl")
+        model_away_path = os.path.join(MODELS_DIR, "model_away.pkl")
+        models_exist = os.path.exists(model_home_path) and os.path.exists(model_away_path)
         return {
-            "status": "healthy",
-            "models_loaded": True,
+            "status": "healthy" if models_exist else "unhealthy",
+            "models_loaded": models_exist,
             "database": os.path.exists(DATABASE_PATH),
         }
-    except RuntimeError as e:
+    except Exception as e:
         return {
             "status": "unhealthy",
             "models_loaded": False,
