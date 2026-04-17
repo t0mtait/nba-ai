@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import pickle
+import json
 import argparse
 from typing import Optional
 
@@ -13,7 +14,6 @@ from sklearn.metrics import accuracy_score, classification_report
 from data_loader import (
     load_games_from_db,
     FEATURE_COLUMNS,
-    get_teams_from_db,
 )
 
 # Model output directory
@@ -156,6 +156,8 @@ def train_models(
     os.makedirs(output_dir, exist_ok=True)
 
     results = {}
+    model_home = None
+    model_away = None
 
     # Train models for each location
     for location, df in [("home", home_games), ("away", away_games)]:
@@ -281,6 +283,20 @@ def train_models(
             "test_preds": test_preds,
         }
 
+        if location == "home":
+            model_home = model
+        else:
+            model_away = model
+
+    # Extract and save insights
+    all_insights = []
+    if model_home is not None or model_away is not None:
+        all_insights = extract_insights(model_home, model_away, games, FEATURE_COLUMNS)
+        insights_path = os.path.join(output_dir, f"{team_code}_insights.json")
+        with open(insights_path, "w") as f:
+            json.dump({"insights": all_insights}, f, indent=2)
+        print(f"✓ Saved insights to {insights_path}")
+
     # Save feature columns
     feature_cols_path = os.path.join(output_dir, "feature_cols.pkl")
     with open(feature_cols_path, "wb") as f:
@@ -336,6 +352,7 @@ def train_models(
             "training_accuracy": overall_train_accuracy,
             "test_accuracy": overall_test_accuracy,
             "models_saved": list(results.keys()),
+            "insights": all_insights,
         }
     else:
         print("\n❌ ERROR: No models were trained successfully")

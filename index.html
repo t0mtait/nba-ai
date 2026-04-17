@@ -264,6 +264,10 @@
             margin-bottom: 20px;
         }
 
+        .card-icon {
+            font-size: 1rem;
+        }
+
         .card-title {
             font-size: 1rem;
             font-weight: 600;
@@ -728,6 +732,85 @@
                 padding: 16px;
             }
         }
+
+        /* Insights Section */
+        .card-body {
+            padding: 0;
+        }
+
+        .insight-rule {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+        }
+
+        .insight-rule.positive {
+            border-color: rgba(62, 207, 106, 0.2);
+        }
+
+        .insight-rule.negative {
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+
+        .insight-symbol {
+            font-size: 1.1rem;
+            flex-shrink: 0;
+            line-height: 1.4;
+        }
+
+        .insight-text {
+            font-size: 0.85rem;
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        .insight-meta {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+
+        .insight-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .insight-badge.home {
+            color: var(--blue);
+            background: var(--blue-dim);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .insight-badge.away {
+            color: #f59e0b;
+            background: rgba(245, 158, 11, 0.15);
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .insight-badge.strong {
+            color: var(--green);
+            background: var(--green-dim);
+            border-color: rgba(62, 207, 106, 0.3);
+        }
+
+        .text-xs { font-size: 0.75rem; }
+        .font-normal { font-weight: 400; }
+        .ml-2 { margin-left: 8px; }
+        .text-gray-500 { color: var(--text-muted); }
+        .text-center { text-align: center; }
+        .py-4 { padding-top: 16px; padding-bottom: 16px; }
+        .space-y-2 > * + * { margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -1331,6 +1414,10 @@
             const baselines = insights.filter(i => i.type === 'baseline');
 
             let html = '';
+
+            // Hide the loading indicator now that we have insights
+            const loadingEl = document.getElementById('insightsLoading');
+            if (loadingEl) loadingEl.style.display = 'none';
 
             if (baselines.length > 0) {
                 baselines.forEach(b => {
