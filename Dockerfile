@@ -12,7 +12,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY app.py .
-COPY celtic.py .
 COPY data_loader.py .
 COPY index.html .
 COPY models/ ./models/

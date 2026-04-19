@@ -38,12 +38,15 @@ async def root():
 @app.post("/predict")
 async def predict(request: PredictionRequest):
     """Predict Celtics win based on game stats."""
-    if request.location.lower() == "home":
+    location = request.location.lower()
+    if location == "home":
         model = model_home
         cols = feature_cols["home"]
-    else:
+    elif location == "away":
         model = model_away
         cols = feature_cols["away"]
+    else:
+        return {"error": "Invalid location. Must be 'home' or 'away'."}, 400
 
     features = [getattr(request, col) for col in cols]
     
@@ -65,9 +68,9 @@ async def game_stats():
     home_games = game_predictions[game_predictions["location"] == "home"]
     away_games = game_predictions[game_predictions["location"] == "away"]
     
-    overall_accuracy = (game_predictions["correct"].sum() / len(game_predictions) * 100)
-    home_accuracy = (home_games["correct"].sum() / len(home_games) * 100) if len(home_games) > 0 else 0
-    away_accuracy = (away_games["correct"].sum() / len(away_games) * 100) if len(away_games) > 0 else 0
+    overall_accuracy = (game_predictions["correct"].sum() / len(game_predictions) * 100) if len(game_predictions) > 0 else 0.0
+    home_accuracy = (home_games["correct"].sum() / len(home_games) * 100) if len(home_games) > 0 else 0.0
+    away_accuracy = (away_games["correct"].sum() / len(away_games) * 100) if len(away_games) > 0 else 0.0
     
     # Get recent games sorted by date (most recent first)
     recent_games = game_predictions.copy()
