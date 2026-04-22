@@ -1,4 +1,11 @@
-"""Train and save the Celtics (or other team) prediction models."""
+"""Train NBA moneyline and spread prediction models.
+
+Predicts moneyline odds and point spreads for any NBA matchup using:
+- Recent head-to-head matchup history
+- Team season-level statistics
+- Home/away performance splits
+- Injury report adjustments
+"""
 from __future__ import annotations
 
 import os
@@ -9,380 +16,449 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, classification_report, mean_absolute_error
 
-from data_loader import (
-    load_games_from_db,
-    FEATURE_COLUMNS,
-)
-
-# Model output directory
-MODELS_DIR = os.environ.get("MODELS_DIR", "models")
+from data_loader import load_games_from_db
 
 
-def extract_insights(model_home, model_away, df, feature_cols):
+# ----- Feature engineering -----
+
+FEATURE_COLUMNS = [
+    "home_net_rtg_diff",
+    "home_ortg_diff",
+    "home_drtg_diff",
+    "home_pace_diff",
+    "home_efg_diff",
+    "home_tov_diff",
+    "home_ftr_diff",
+    "h2h_win_pct_diff",
+    "h2h_avg_margin",
+    "rest_diff",
+    "injury_impact",
+    "home_court_adv",
+]
+
+
+def compute_h2h_features(team: str, opponent: str, cutoff_date: str, db_path: Optional[str] = None) -> dict:
     """
-    Extract human-readable insights from trained logistic regression models.
-    Returns a list of insight dicts with type, label, direction, and description.
+    Compute head-to-head features between two teams.
+    Uses all games before cutoff_date.
     """
-    insights = []
+    import db as _db
 
-    feat_names = {
-        "pace": "Pace",
-        "ftr": "Free Throw Rate",
-        "efg_pct": "Effective FG%",
-        "tov_pct": "Turnover %",
-        "orb_pct": "Offensive Rebound %",
+    games = _db.get_matchups(team=team, opponent=opponent, limit=50, db_path=db_path)
+
+    # Filter to games before cutoff
+    games = [g for g in games if g["date"] < cutoff_date]
+
+    if not games:
+        return {
+            "h2h_win_pct": 0.5,
+            "h2h_avg_margin": 0.0,
+            "h2h_games": 0,
+        }
+
+    wins = sum(1 for g in games if g["result"] == "W")
+    total = len(games)
+
+    # Margin from team perspective
+    margins = []
+    for g in games:
+        if g["team_score"] and g["opponent_score"]:
+            margin = g["team_score"] - g["opponent_score"]
+            # Flip sign since games are from team perspective
+            if g["location"] == "away":
+                margin = -margin
+            margins.append(margin)
+
+    avg_margin = np.mean(margins) if margins else 0.0
+
+    return {
+        "h2h_win_pct": wins / total if total > 0 else 0.5,
+        "h2h_avg_margin": avg_margin,
+        "h2h_games": total,
     }
 
-    for location, model in [("home", model_home), ("away", model_away)]:
-        if model is None:
+
+def compute_injury_impact(team: str, game_date: str, db_path: Optional[str] = None) -> float:
+    """
+    Estimate injury impact for a team on a given date.
+    Returns a float: positive = team is undermanned (disadvantage).
+    """
+    import db as _db
+
+    injuries = _db.get_injuries(team=team, db_path=db_path)
+
+    impact = 0.0
+    for inj in injuries:
+        # Only count injuries reported before game date
+        if inj.get("date_reported", "") >= game_date:
             continue
+        status = (inj.get("status") or "").lower()
+        # Questionable / doubtful = moderate impact; out = full impact
+        if status in ("out", "doubtful"):
+            impact -= 2.0
+        elif status in ("questionable", "probable"):
+            impact -= 0.5
 
-        coef = dict(zip(feature_cols, model.coef_[0]))
-        medians = df[feature_cols].median()
+    return impact
 
-        # Pre-compute baseline log-odds and probability (once per model)
-        log_odds_baseline = model.intercept_[0] + sum(
-            c * medians[f] for f, c in zip(feature_cols, model.coef_[0])
-        )
-        p_baseline = 1 / (1 + np.exp(-log_odds_baseline))
 
-        for feat, coeff in coef.items():
-            if abs(coeff) < 0.01:
-                continue
+def compute_rest_diff(team: str, opponent: str, game_date: str, db_path: Optional[str] = None) -> float:
+    """
+    Compute rest advantage (days since last game).
+    Positive = this team is more rested.
+    """
+    import db as _db
 
-            # Determine direction label
-            if coeff > 0:
-                direction = "higher"
-                symbol = "↑"
+    def last_game_date(team_code: str, before_date: str) -> Optional[str]:
+        games = _db.get_games(team=team_code, limit=10, db_path=db_path)
+        before = [g["date"] for g in games if g["date"] < before_date]
+        return max(before) if before else None
+
+    team_last = last_game_date(team, game_date)
+    opp_last = last_game_date(opponent, game_date)
+
+    if team_last is None or opp_last is None:
+        return 0.0
+
+    try:
+        team_days = (pd.to_datetime(game_date) - pd.to_datetime(team_last)).days
+        opp_days = (pd.to_datetime(game_date) - pd.to_datetime(opp_last)).days
+        return team_days - opp_days
+    except Exception:
+        return 0.0
+
+
+def build_features_for_game(
+    team: str,
+    opponent: str,
+    game_date: str,
+    location: str,
+    db_path: Optional[str] = None,
+) -> dict:
+    """
+    Build a feature dict for a single game prediction.
+    All features are from `team`'s perspective.
+    """
+    import db as _db
+
+    # Get current season year
+    try:
+        season_year = int(game_date[:4])
+        if int(game_date[5:7]) <= 6:
+            season_year -= 1  # Jan-Jun is part of previous season
+    except Exception:
+        season_year = 2024
+
+    team_stats = _db.get_team_stats(team, season_year, db_path) or {}
+    opp_stats = _db.get_team_stats(opponent, season_year, db_path) or {}
+
+    # Net ratings
+    team_net = team_stats.get("net_rtg", 0) or 0
+    opp_net = opp_stats.get("net_rtg", 0) or 0
+    home_net_rtg_diff = team_net - opp_net if location == "home" else opp_net - team_net
+
+    team_ortg = team_stats.get("ortg", 0) or 0
+    opp_ortg = opp_stats.get("ortg", 0) or 0
+    home_ortg_diff = team_ortg - opp_ortg if location == "home" else opp_ortg - team_ortg
+
+    team_drtg = team_stats.get("drtg", 0) or 0
+    opp_drtg = opp_stats.get("drtg", 0) or 0
+    home_drtg_diff = team_drtg - opp_drtg if location == "home" else opp_drtg - team_drtg
+
+    team_pace = team_stats.get("pace", 0) or 0
+    opp_pace = opp_stats.get("pace", 0) or 0
+    home_pace_diff = team_pace - opp_pace if location == "home" else opp_pace - team_pace
+
+    team_efg = team_stats.get("efg_pct", 0) or 0
+    opp_efg = opp_stats.get("efg_pct", 0) or 0
+    home_efg_diff = team_efg - opp_efg if location == "home" else opp_efg - team_efg
+
+    team_tov = team_stats.get("tov_pct", 0) or 0
+    opp_tov = opp_stats.get("tov_pct", 0) or 0
+    home_tov_diff = team_tov - opp_tov if location == "home" else opp_tov - team_tov
+
+    team_ftr = team_stats.get("ftr", 0) or 0
+    opp_ftr = opp_stats.get("ftr", 0) or 0
+    home_ftr_diff = team_ftr - opp_ftr if location == "home" else opp_ftr - team_ftr
+
+    # H2H features
+    h2h = compute_h2h_features(team, opponent, game_date, db_path)
+    # If team is home, h2h_win_pct is already from team perspective
+    h2h_win_pct_diff = h2h["h2h_win_pct"] - 0.5  # Center around 0.5
+    h2h_avg_margin = h2h["h2h_avg_margin"] if location == "home" else -h2h["h2h_avg_margin"]
+
+    # Rest advantage
+    rest_diff = compute_rest_diff(team, opponent, game_date, db_path)
+
+    # Injury impact
+    team_inj = compute_injury_impact(team, game_date, db_path)
+    opp_inj = compute_injury_impact(opponent, game_date, db_path)
+    injury_impact = team_inj - opp_inj  # Positive = advantage
+
+    # Home court advantage (historical home win%)
+    home_court_adv = 0.58 if location == "home" else -0.58
+
+    return {
+        "home_net_rtg_diff": home_net_rtg_diff,
+        "home_ortg_diff": home_ortg_diff,
+        "home_drtg_diff": home_drtg_diff,
+        "home_pace_diff": home_pace_diff,
+        "home_efg_diff": home_efg_diff,
+        "home_tov_diff": home_tov_diff,
+        "home_ftr_diff": home_ftr_diff,
+        "h2h_win_pct_diff": h2h_win_pct_diff,
+        "h2h_avg_margin": h2h_avg_margin,
+        "rest_diff": rest_diff,
+        "injury_impact": injury_impact,
+        "home_court_adv": home_court_adv,
+    }
+
+
+def build_dataset(db_path: Optional[str] = None) -> pd.DataFrame:
+    """
+    Build a full dataset of games with features and targets.
+    Each row = one team's perspective on a game.
+    """
+    import db as _db
+
+    games = _db.get_games(limit=None, db_path=db_path)
+    if not games:
+        return pd.DataFrame()
+
+    rows = []
+    for game in games:
+        team = game["team"]
+        opponent = game["opponent"]
+        location = game["location"]
+        game_date = game["date"]
+        result_w = 1 if game["result"] == "W" else 0
+
+        # Moneyline target: did team win?
+        # Spread target: did team cover? (team_score - opponent_score vs line)
+        # We'll compute spread cover from score data
+        team_score = game.get("team_score")
+        opp_score = game.get("opponent_score")
+        home_spread = game.get("home_spread")
+
+        features = build_features_for_game(team, opponent, game_date, location, db_path)
+        features["team"] = team
+        features["opponent"] = opponent
+        features["location"] = location
+        features["game_date"] = game_date
+        features["result_w"] = result_w
+
+        # Spread cover: team covers if margin > spread (home team -spread)
+        if team_score and opp_score is not None and home_spread is not None:
+            margin = team_score - opp_score
+            if location == "home":
+                covered = margin > home_spread  # home team is -spread
             else:
-                direction = "lower"
-                symbol = "↓"
+                covered = -margin > home_spread  # away team is +spread
+            features["covered_spread"] = 1 if covered else 0
+        else:
+            features["covered_spread"] = -1  # unknown
 
-            label = feat_names.get(feat, feat)
+        rows.append(features)
 
-            # Quantify the effect: for a 1-SD change in this feature,
-            # how much does win probability change?
-            # coeff * sd = change in log-odds for 1-SD change
-            # Use sigmoid derivative: d_prob ≈ p * (1-p) * d_log_odds
-            sd = df[feat].std()
-            log_odds_change = coeff * sd
-            prob_change = abs(log_odds_change) * p_baseline * (1 - p_baseline)
-            prob_pct = prob_change * 100
+    return pd.DataFrame(rows)
 
-            # Describe the typical range
-            typical_low = round(medians[feat] - sd, 3)
-            typical_high = round(medians[feat] + sd, 3)
 
-            if prob_pct > 5:
-                strength = "strong"
-            elif prob_pct > 2:
-                strength = "moderate"
-            else:
-                strength = "mild"
+def train_moneyline_model(df: pd.DataFrame, output_dir: str = "models") -> dict:
+    """Train moneyline (win/loss) model."""
+    if df.empty:
+        return {"error": "No data for moneyline model"}
 
-            insights.append({
-                "type": "rule",
-                "location": location,
-                "feature": feat,
-                "label": label,
-                "direction": direction,
-                "symbol": symbol,
-                "strength": strength,
-                "probChange": round(prob_pct, 1),
-                "typicalRange": f"{typical_low}–{typical_high}",
-                "description": (
-                    f"{symbol} {label}: {strength} effect on win probability "
-                    f"(±{prob_pct:.1f}% for 1-SD change). "
-                    f"Typical range: {typical_low}–{typical_high}."
-                ),
-            })
+    # Filter rows with known outcome
+    train_df = df[df["result_w"].isin([0, 1])].copy()
 
-    # Add overall model intercept insight
-    for location, model in [("home", model_home), ("away", model_away)]:
-        if model is None:
+    if len(train_df) < 30:
+        return {"error": "Not enough training data for moneyline model"}
+
+    # Sort by date for chronological split
+    train_df = train_df.sort_values("game_date")
+
+    # Last 20% = test set
+    split_idx = int(len(train_df) * 0.8)
+    train_set = train_df.iloc[:split_idx]
+    test_set = train_df.iloc[split_idx:]
+
+    X_train = train_set[FEATURE_COLUMNS].fillna(0)
+    y_train = train_set["result_w"]
+    X_test = test_set[FEATURE_COLUMNS].fillna(0)
+    y_test = test_set["result_w"]
+
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    model = LogisticRegression(max_iter=2000, class_weight="balanced", solver="lbfgs")
+    model.fit(X_train_scaled, y_train)
+
+    train_acc = accuracy_score(y_train, model.predict(X_train_scaled))
+    test_acc = accuracy_score(y_test, model.predict(X_test_scaled))
+
+    # Save
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "ml_model.pkl"), "wb") as f:
+        pickle.dump({"model": model, "scaler": scaler, "feature_cols": FEATURE_COLUMNS}, f)
+
+    return {
+        "type": "moneyline",
+        "train_accuracy": round(train_acc * 100, 1),
+        "test_accuracy": round(test_acc * 100, 1),
+        "train_games": len(train_set),
+        "test_games": len(test_set),
+    }
+
+
+def train_spread_model(df: pd.DataFrame, output_dir: str = "models") -> dict:
+    """Train spread (cover/don't cover) model."""
+    if df.empty:
+        return {"error": "No data for spread model"}
+
+    # Filter rows with known spread outcome
+    train_df = df[df["covered_spread"].isin([0, 1])].copy()
+
+    if len(train_df) < 30:
+        return {"error": "Not enough training data for spread model"}
+
+    train_df = train_df.sort_values("game_date")
+
+    split_idx = int(len(train_df) * 0.8)
+    train_set = train_df.iloc[:split_idx]
+    test_set = train_df.iloc[split_idx:]
+
+    X_train = train_set[FEATURE_COLUMNS].fillna(0)
+    y_train = train_set["covered_spread"]
+    X_test = test_set[FEATURE_COLUMNS].fillna(0)
+    y_test = test_set["covered_spread"]
+
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    model = LogisticRegression(max_iter=2000, class_weight="balanced", solver="lbfgs")
+    model.fit(X_train_scaled, y_train)
+
+    train_acc = accuracy_score(y_train, model.predict(X_train_scaled))
+    test_acc = accuracy_score(y_test, model.predict(X_test_scaled))
+
+    # Also train a regression model to predict margin
+    reg = Ridge(alpha=1.0)
+    reg.fit(X_train_scaled, y_train)
+    mae = mean_absolute_error(y_test, reg.predict(X_test_scaled))
+
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "spread_model.pkl"), "wb") as f:
+        pickle.dump({"model": model, "scaler": scaler, "feature_cols": FEATURE_COLUMNS}, f)
+    with open(os.path.join(output_dir, "spread_reg.pkl"), "wb") as f:
+        pickle.dump({"model": reg, "scaler": scaler, "feature_cols": FEATURE_COLUMNS}, f)
+
+    return {
+        "type": "spread",
+        "train_accuracy": round(train_acc * 100, 1),
+        "test_accuracy": round(test_acc * 100, 1),
+        "margin_mae": round(mae, 2),
+        "train_games": len(train_set),
+        "test_games": len(test_set),
+    }
+
+
+def extract_model_insights(model_data: dict, feature_names: list[str]) -> list[dict]:
+    """Extract readable insights from a trained model."""
+    model = model_data["model"]
+    scaler = model_data["scaler"]
+
+    insights = []
+    coef = dict(zip(feature_names, model.coef_[0]))
+    abs_coef = sorted(coef.items(), key=lambda x: abs(x[1]), reverse=True)
+
+    for feat, coeff in abs_coef[:6]:
+        if abs(coeff) < 0.01:
             continue
-        # sigmoid(intercept) = probability when all features are at zero
-        base_win_prob = 1 / (1 + np.exp(-model.intercept_[0]))
+        direction = "increases" if coeff > 0 else "decreases"
         insights.append({
-            "type": "baseline",
-            "location": location,
-            "baseWinProb": round(base_win_prob * 100, 1),
-            "description": (
-                f"{location.title()} win probability when all factors are at median: "
-                f"{round(base_win_prob * 100, 1)}%"
-            ),
+            "feature": feat,
+            "direction": direction,
+            "coefficient": round(float(coeff), 3),
+            "description": f"{feat.replace('_', ' ').title()} {direction} win probability",
         })
 
     return insights
 
 
-def train_models(
-    team_code: str = "BOS",
-    season_year: Optional[int] = None,
-    output_dir: str = MODELS_DIR,
-) -> dict:
-    """
-    Train prediction models for a team using chronological train/test split.
-
-    The 20 most recent games are held out as the TEST set.
-    All older games are used for TRAINING.
-
-    Args:
-        team_code: Team code to train on (e.g., 'BOS', 'LAL')
-        season_year: Optional specific season to train on
-        output_dir: Directory to save models
-
-    Returns:
-        Dict with training results and metrics
-    """
+def train_models(output_dir: str = "models", db_path: Optional[str] = None) -> dict:
+    """Build dataset and train both moneyline and spread models."""
     print(f"\n{'='*60}")
-    print(f"Training prediction model for {team_code}")
+    print("Training NBA prediction models")
     print(f"{'='*60}\n")
 
-    # Load games from database
-    print(f"Loading games from database...")
-    games = load_games_from_db(team_code=team_code, season_year=season_year)
+    print("Building feature dataset...")
+    df = build_dataset(db_path)
 
-    if games.empty:
-        print(f"ERROR: No games found in database for {team_code}")
-        print(f"Hint: Run 'python -c \"import db; db.fetch_team_games('{team_code}')\"' to fetch data")
-        return {"error": "No games found"}
+    if df.empty:
+        print("ERROR: No games found in database.")
+        print("Hint: Run fetch_basketball_ref.py to fetch game data first.")
+        return {"error": "No games in database"}
 
-    print(f"Total games loaded: {len(games)}")
-
-    # Sort by date - oldest first
-    games = games.sort_values("date")
-    print(f"Date range: {games['date'].min()} to {games['date'].max()}")
-
-    # Split by location
-    home_games = games[games["location"] == "home"].copy()
-    away_games = games[games["location"] == "away"].copy()
-
-    print(f"Home games: {len(home_games)}")
-    print(f"Away games: {len(away_games)}")
-
-    os.makedirs(output_dir, exist_ok=True)
+    print(f"Total game records: {len(df)}")
+    valid_ml = df[df["result_w"].isin([0, 1])]
+    valid_spread = df[df["covered_spread"].isin([0, 1])]
+    print(f"Games with win outcome: {len(valid_ml)}")
+    print(f"Games with spread outcome: {len(valid_spread)}")
 
     results = {}
-    model_home = None
-    model_away = None
 
-    # Train models for each location
-    for location, df in [("home", home_games), ("away", away_games)]:
-        if df.empty:
-            print(f"\n⚠️  No {location} games found, skipping {location} model")
-            continue
+    print("\nTraining moneyline model...")
+    ml_result = train_moneyline_model(df, output_dir)
+    if "error" not in ml_result:
+        print(f"  Moneyline accuracy — train: {ml_result['train_accuracy']}%, test: {ml_result['test_accuracy']}%")
 
-        print(f"\n{'-'*40}")
-        print(f"Training {location.upper()} model")
-        print(f"{'-'*40}")
+        # Load and extract insights
+        with open(os.path.join(output_dir, "ml_model.pkl"), "rb") as f:
+            ml_data = pickle.load(f)
+        ml_insights = extract_model_insights(ml_data, FEATURE_COLUMNS)
+        with open(os.path.join(output_dir, "ml_insights.json"), "w") as f:
+            json.dump({"insights": ml_insights}, f, indent=2)
+        ml_result["insights"] = ml_insights
+        results["moneyline"] = ml_result
 
-        # Prepare features and target
-        subset = df[FEATURE_COLUMNS].copy()
+    print("\nTraining spread model...")
+    sp_result = train_spread_model(df, output_dir)
+    if "error" not in sp_result:
+        print(f"  Spread accuracy — train: {sp_result['train_accuracy']}%, test: {sp_result['test_accuracy']}%")
+        print(f"  Margin MAE: {sp_result['margin_mae']} points")
 
-        # Drop rows with missing features using boolean mask on the dataframe
-        mask = subset.notna().all(axis=1)
-        valid_indices = mask[mask].index
-        df_valid = df.loc[valid_indices].copy()
+        with open(os.path.join(output_dir, "spread_model.pkl"), "rb") as f:
+            sp_data = pickle.load(f)
+        sp_insights = extract_model_insights(sp_data, FEATURE_COLUMNS)
+        with open(os.path.join(output_dir, "spread_insights.json"), "w") as f:
+            json.dump({"insights": sp_insights}, f, indent=2)
+        sp_result["insights"] = sp_insights
+        results["spread"] = sp_result
 
-        # Extract aligned arrays from the filtered dataframe
-        subset = df_valid[FEATURE_COLUMNS]
-        y = df_valid["celtics_win"].values
-        dates = df_valid["date"].values
-        opponents = df_valid["opponent"].values
+    print(f"\n{'='*60}")
+    print("Training complete")
+    print(f"{'='*60}")
+    print(f"Models saved to: {output_dir}/")
 
-        if len(subset) < 10:
-            print(f"⚠️  Not enough valid games for {location} model ({len(subset)} games)")
-            continue
-
-        # Chronological split: last 20 games are test set
-        test_df = df_valid.tail(20)
-        train_df = df_valid.iloc[:-20]
-
-        # Only use test set if we have enough training data
-        if len(train_df) < 30:
-            print(f"⚠️  Not enough training games ({len(train_df)}), need at least 30")
-            return {"error": "Not enough training data"}
-
-        X_train = train_df[FEATURE_COLUMNS]
-        y_train = train_df["celtics_win"]
-        X_test = test_df[FEATURE_COLUMNS]
-        y_test = test_df["celtics_win"]
-
-        print(f"Training samples: {len(X_train)}, Test samples: {len(X_test)}")
-
-        # Train model
-        model = LogisticRegression(
-            max_iter=2000,
-            class_weight="balanced",
-            solver="lbfgs",
-        )
-        model.fit(X_train, y_train)
-
-        # Evaluate on TRAINING set
-        y_train_pred = model.predict(X_train)
-        train_accuracy = accuracy_score(y_train, y_train_pred)
-        print(f"\n{location.capitalize()} TRAINING accuracy: {train_accuracy:.3f} ({train_accuracy*100:.1f}%)")
-
-        # Evaluate on TEST set (held-out 20 most recent games)
-        y_test_pred = model.predict(X_test)
-        test_accuracy = accuracy_score(y_test, y_test_pred)
-        print(f"{location.capitalize()} TEST accuracy: {test_accuracy:.3f} ({test_accuracy*100:.1f}%)")
-
-        print("\nClassification Report (TEST set):")
-        print(classification_report(y_test, y_test_pred))
-
-        # Save model with team-specific name (fall back to default for BOS)
-        model_path = os.path.join(output_dir, f"model_{location}_{team_code}.pkl")
-        if team_code == "BOS":
-            model_path = os.path.join(output_dir, f"model_{location}.pkl")
-
-        with open(model_path, "wb") as f:
-            pickle.dump(model, f)
-        print(f"✓ Saved {location} model to {model_path}")
-
-        # Generate predictions for ALL games (train + test)
-        all_predictions = model.predict(subset)
-        all_probs = model.predict_proba(subset)
-
-        # Build predictions DataFrame from the valid dataframe plus model outputs
-        pred_df = df_valid[["date", "opponent", "location"]].copy()
-        pred_df["pace"] = df_valid["pace"].values
-        pred_df["ftr"] = df_valid["ftr"].values
-        pred_df["efg_pct"] = df_valid["efg_pct"].values
-        pred_df["tov_pct"] = df_valid["tov_pct"].values
-        pred_df["orb_pct"] = df_valid["orb_pct"].values
-        pred_df["prediction"] = all_predictions
-        pred_df["actual"] = y
-        pred_df["win_prob"] = all_probs[:, 1]
-        pred_df["correct"] = all_predictions == y
-
-        # Split into train/test predictions for accuracy tracking
-        train_preds = pred_df.iloc[:-20]
-        test_preds = pred_df.tail(20)
-
-        results[location] = {
-            "model": model,
-            "train_accuracy": train_accuracy,
-            "test_accuracy": test_accuracy,
-            "predictions": pred_df,
-            "train_preds": train_preds,
-            "test_preds": test_preds,
-        }
-
-        if location == "home":
-            model_home = model
-        else:
-            model_away = model
-
-    # Extract and save insights
-    all_insights = []
-    if model_home is not None or model_away is not None:
-        all_insights = extract_insights(model_home, model_away, games, FEATURE_COLUMNS)
-        insights_path = os.path.join(output_dir, f"{team_code}_insights.json")
-        with open(insights_path, "w") as f:
-            json.dump({"insights": all_insights}, f, indent=2)
-        print(f"✓ Saved insights to {insights_path}")
-
-    # Save feature columns
-    feature_cols_path = os.path.join(output_dir, "feature_cols.pkl")
-    with open(feature_cols_path, "wb") as f:
-        pickle.dump(
-            {"home": FEATURE_COLUMNS, "away": FEATURE_COLUMNS},
-            f,
-        )
-    print(f"\n✓ Saved feature columns to {feature_cols_path}")
-
-    # Combine and save team-specific predictions CSV
-    all_preds = []
-    for location, result in results.items():
-        all_preds.append(result["predictions"])
-
-    if all_preds:
-        combined_preds = pd.concat(all_preds, ignore_index=True)
-        combined_preds = combined_preds.sort_values("date", ascending=False)
-
-        # Save team-specific predictions CSV
-        preds_path = os.path.join(output_dir, f"{team_code}_predictions.csv")
-        combined_preds.to_csv(preds_path, index=False)
-        print(f"✓ Saved {len(combined_preds)} game predictions to {preds_path}")
-
-        # Also save as default for BOS
-        if team_code == "BOS":
-            default_preds_path = os.path.join(output_dir, "game_predictions.csv")
-            combined_preds.to_csv(default_preds_path, index=False)
-            print(f"✓ Saved default predictions to {default_preds_path}")
-
-        # Calculate overall training accuracy
-        train_correct = sum(r["train_accuracy"] * len(r["train_preds"]) for r in results.values())
-        train_total = sum(len(r["train_preds"]) for r in results.values())
-        overall_train_accuracy = train_correct / train_total * 100 if train_total > 0 else 0
-
-        # Calculate overall test accuracy
-        test_correct = sum(r["test_accuracy"] * len(r["test_preds"]) for r in results.values())
-        test_total = sum(len(r["test_preds"]) for r in results.values())
-        overall_test_accuracy = test_correct / test_total * 100 if test_total > 0 else 0
-
-        total_games = train_total + test_total
-
-        print(f"\n{'='*60}")
-        print(f"TRAINING COMPLETE FOR {team_code}")
-        print(f"{'='*60}")
-        print(f"Total games: {total_games}")
-        print(f"Training accuracy (older games): {overall_train_accuracy:.1f}%")
-        print(f"Test accuracy (20 most recent): {overall_test_accuracy:.1f}%")
-        print(f"Models saved to: {output_dir}/")
-
-        return {
-            "team": team_code,
-            "total_games": total_games,
-            "training_accuracy": overall_train_accuracy,
-            "test_accuracy": overall_test_accuracy,
-            "models_saved": list(results.keys()),
-            "insights": all_insights,
-        }
-    else:
-        print("\n❌ ERROR: No models were trained successfully")
-        return {"error": "Training failed"}
+    return results
 
 
 def main():
-    """Main entry point for training script."""
-    parser = argparse.ArgumentParser(description="Train NBA prediction models")
-    parser.add_argument(
-        "--team",
-        type=str,
-        default="BOS",
-        help="Team code to train on (default: BOS)",
-    )
-    parser.add_argument(
-        "--season",
-        type=int,
-        default=None,
-        help="Specific season year to train on (e.g., 2025 for 2024-25 season)",
-    )
-    parser.add_argument(
-        "--output",
-        type=str,
-        default=MODELS_DIR,
-        help=f"Output directory for models (default: {MODELS_DIR})",
-    )
-
+    parser = argparse.ArgumentParser(description="Train NBA moneyline and spread models")
+    parser.add_argument("--output", type=str, default="models", help="Output directory")
+    parser.add_argument("--db-path", type=str, default=None, help="Path to SQLite database")
     args = parser.parse_args()
 
-    result = train_models(
-        team_code=args.team,
-        season_year=args.season,
-        output_dir=args.output,
-    )
-
+    result = train_models(output_dir=args.output, db_path=args.db_path)
     if "error" in result:
         print(f"\nError: {result['error']}")
         return 1
-
     return 0
 
 

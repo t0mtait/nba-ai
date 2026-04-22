@@ -1,4 +1,4 @@
-"""FastAPI backend for Celtics win prediction."""
+"""FastAPI backend for NBA moneyline and spread predictions."""
 from __future__ import annotations
 
 import os
@@ -15,18 +15,17 @@ import pickle
 
 import db
 import train_models as tm
-from data_loader import load_games_from_db, FEATURE_COLUMNS
+from data_loader import load_games_from_db
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="NBA Win Prediction API",
-    description="Predict NBA game outcomes using advanced statistics",
+    title="NBA Prediction API",
+    description="Predict NBA moneyline and point spread outcomes for any matchup",
 )
 
-# CORS for local development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,53 +34,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Model and data paths
 MODELS_DIR = os.environ.get("MODELS_DIR", "models")
-DATABASE_PATH = os.environ.get("DATABASE_PATH", os.path.join(os.path.dirname(__file__), "nba_games.db"))
+DATABASE_PATH = os.environ.get("DATABASE_PATH", os.path.join(os.path.dirname(__file__), "nba.db"))
 
 
-def _get_model_paths(team_code: str):
-    """Get model paths for a team, with fallback to default models."""
-    model_home_path = os.path.join(MODELS_DIR, f"model_home_{team_code}.pkl")
-    model_away_path = os.path.join(MODELS_DIR, f"model_away_{team_code}.pkl")
-
-    # Fall back to default if team-specific doesn't exist
-    if not os.path.exists(model_home_path):
-        model_home_path = os.path.join(MODELS_DIR, "model_home.pkl")
-    if not os.path.exists(model_away_path):
-        model_away_path = os.path.join(MODELS_DIR, "model_away.pkl")
-
-    return model_home_path, model_away_path
+def _load_model(name: str) -> dict:
+    """Load a model + scaler bundle from disk."""
+    path = os.path.join(MODELS_DIR, name)
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Model not found: {path}. Run train_models.py first.")
+    with open(path, "rb") as f:
+        return pickle.load(f)
 
 
-def _load_models_for_team(team_code: str):
-    """Load models for a specific team."""
-    model_home_path, model_away_path = _get_model_paths(team_code)
+def _get_or_compute_features(
+    team: str,
+    opponent: str,
+    game_date: str,
+    location: str,
+    db_path: Optional[str] = None,
+) -> dict:
+    """Get cached features or build them on the fly."""
+    return tm.build_features_for_game(team, opponent, game_date, location, db_path)
 
-    try:
-        with open(model_home_path, "rb") as f:
-            model_home = pickle.load(f)
-        with open(model_away_path, "rb") as f:
-            model_away = pickle.load(f)
-        with open(os.path.join(MODELS_DIR, "feature_cols.pkl"), "rb") as f:
-            feature_cols = pickle.load(f)
-        return model_home, model_away, feature_cols
-    except FileNotFoundError as e:
-        raise RuntimeError(f"Model file not found: {e}. Run train_models.py first.")
-    except Exception as e:
-        raise RuntimeError(f"Failed to load models: {e}")
 
+# ----- Pydantic models -----
 
 class PredictionRequest(BaseModel):
-    team_code: str = Field(default="BOS", description="Team code (e.g., BOS, LAL)")
-    location: str  # "home" or "away"
-    pace: float = Field(..., ge=0, le=200, description="Game pace (typical NBA range: 85-105)")
-    ftr: float = Field(..., ge=0, le=1, description="Free Throw Rate (0-1)")
-    efg_pct: float = Field(..., ge=0, le=1, description="Effective FG% (0-1)")
-    tov_pct: float = Field(..., ge=0, le=1, description="Turnover % (0-1)")
-    orb_pct: float = Field(..., ge=0, le=1, description="Offensive Rebound % (0-1)")
+    team: str = Field(..., description="Team code (e.g. BOS, LAL)")
+    opponent: str = Field(..., description="Opponent team code")
+    game_date: str = Field(..., description="Game date (YYYY-MM-DD)")
+    location: str = Field(..., description="'home' or 'away'")
 
-    @field_validator("team_code")
+    @field_validator("team", "opponent")
     @classmethod
     def validate_team_code(cls, v: str) -> str:
         return v.upper()
@@ -100,18 +85,7 @@ class FetchRequest(BaseModel):
     force_refresh: bool = Field(default=False)
 
 
-class TeamInfo(BaseModel):
-    code: str
-    name: str
-    fetched_games_count: int
-    games_in_db: int
-    wins: int
-    losses: int
-    win_pct: float
-    last_fetched: Optional[str]
-
-
-# ----- ROUTES -----
+# ----- Routes -----
 
 @app.get("/")
 async def root():
@@ -120,89 +94,198 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """Health check endpoint - reports whether models are loaded."""
-    try:
-        # Check that model files exist
-        model_home_path = os.path.join(MODELS_DIR, "model_home.pkl")
-        model_away_path = os.path.join(MODELS_DIR, "model_away.pkl")
-        models_exist = os.path.exists(model_home_path) and os.path.exists(model_away_path)
-        return {
-            "status": "healthy" if models_exist else "unhealthy",
-            "models_loaded": models_exist,
-            "database": os.path.exists(DATABASE_PATH),
-        }
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "models_loaded": False,
-            "error": str(e),
-            "database": os.path.exists(DATABASE_PATH),
-        }
+    ml_exists = os.path.exists(os.path.join(MODELS_DIR, "ml_model.pkl"))
+    sp_exists = os.path.exists(os.path.join(MODELS_DIR, "spread_model.pkl"))
+    return {
+        "status": "healthy" if (ml_exists and sp_exists) else "unhealthy",
+        "moneyline_model": ml_exists,
+        "spread_model": sp_exists,
+        "database": os.path.exists(DATABASE_PATH),
+    }
 
 
-@app.get("/teams", response_model=list[dict])
+@app.get("/teams")
 async def list_teams():
-    """List all teams in the database with their stats."""
     try:
-        teams = db.get_teams()
-        return teams
+        return db.get_teams()
     except Exception as e:
         logger.error(f"Error fetching teams: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/teams/{team_code}", response_model=dict)
+@app.get("/teams/{team_code}")
 async def get_team(team_code: str):
-    """Get info for a specific team."""
     team = db.get_team_info(team_code.upper())
     if not team:
-        raise HTTPException(status_code=404, detail=f"Team {team_code} not found in database")
+        raise HTTPException(status_code=404, detail=f"Team {team_code} not found")
     return team
 
 
-@app.post("/teams/{team_code}/fetch")
-async def fetch_team_games(
-    team_code: str,
-    request: FetchRequest,
-    background_tasks: BackgroundTasks,
-):
-    """
-    Fetch games from basketball-reference.com for a team.
+@app.get("/teams/{team_code}/stats/{season_year}")
+async def get_team_stats(team_code: str, season_year: int):
+    stats = db.get_team_stats(team_code.upper(), season_year)
+    if not stats:
+        raise HTTPException(status_code=404, detail=f"No stats found for {team_code} in {season_year}")
+    return stats
 
-    This runs in the background and returns immediately with a task ID.
+
+@app.get("/teams/{team_code}/injuries")
+async def get_team_injuries(team_code: str):
+    injuries = db.get_injuries(team=team_code.upper())
+    return {"team": team_code.upper(), "injuries": injuries}
+
+
+@app.get("/matchups/{team}/vs/{opponent}")
+async def get_matchup_history(team: str, opponent: str, limit: int = Query(default=20)):
+    team = team.upper()
+    opponent = opponent.upper()
+    games = db.get_recent_matchup(team, opponent, n=limit)
+    return {
+        "matchup": f"{team} vs {opponent}",
+        "team": team,
+        "opponent": opponent,
+        "count": len(games),
+        "games": games,
+    }
+
+
+@app.post("/predict")
+async def predict(request: PredictionRequest):
     """
+    Predict moneyline and spread for a given matchup.
+    Returns win probability, predicted margin, and recommended bet.
+    """
+    team = request.team.upper()
+    opponent = request.opponent.upper()
+    location = request.location.lower()
+
+    # Load models
+    try:
+        ml_data = _load_model("ml_model.pkl")
+        sp_data = _load_model("spread_model.pkl")
+        reg_data = _load_model("spread_reg.pkl")
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Models not loaded: {e}. Run train_models.py first.",
+        )
+
+    # Build features
+    features = _get_or_compute_features(team, opponent, request.game_date, location)
+    feature_vec = pd.DataFrame([features])[ml_data["feature_cols"]].fillna(0)
+    feature_vec_scaled = ml_data["scaler"].transform(feature_vec)
+
+    # Moneyline prediction
+    ml_model = ml_data["model"]
+    win_prob = float(ml_model.predict_proba(feature_vec_scaled)[0][1])
+    predicted_win = bool(ml_model.predict(feature_vec_scaled)[0])
+
+    # Spread regression (predicted margin in points)
+    reg = reg_data["model"]
+    predicted_margin = float(reg.predict(feature_vec_scaled)[0])
+
+    # Spread classification (will team cover?)
+    sp_model = sp_data["model"]
+    cover_prob = float(sp_model.predict_proba(feature_vec_scaled)[0][1])
+    predicted_cover = bool(sp_model.predict(feature_vec_scaled)[0])
+
+    # Adjust for home/away
+    if location == "home":
+        predicted_spread = round(-predicted_margin, 1)
+    else:
+        predicted_spread = round(predicted_margin, 1)
+
+    # Clamp spread to typical NBA range (-15 to +15)
+    predicted_spread = max(-15, min(15, predicted_spread))
+
+    # Moneyline recommendation
+    if win_prob > 0.55:
+        ml_rec = f"BET {team}"
+        ml_conf = "high" if win_prob > 0.65 else "medium"
+    elif win_prob < 0.45:
+        ml_rec = f"BET {opponent}"
+        ml_conf = "high" if win_prob < 0.35 else "medium"
+    else:
+        ml_rec = "PASS"
+        ml_conf = None
+
+    # Spread recommendation
+    if cover_prob > 0.55:
+        if location == "home":
+            sp_rec = f"BET {team} -{abs(predicted_spread)}"
+        else:
+            sp_rec = f"BET {team} +{abs(predicted_spread)}"
+        sp_conf = "high" if cover_prob > 0.65 else "medium"
+    elif cover_prob < 0.45:
+        if location == "home":
+            sp_rec = f"BET {opponent} +{abs(predicted_spread)}"
+        else:
+            sp_rec = f"BET {opponent} -{abs(predicted_spread)}"
+        sp_conf = "high" if cover_prob < 0.35 else "medium"
+    else:
+        sp_rec = "PASS"
+        sp_conf = None
+
+    return {
+        "matchup": f"{team} ({'home' if location == 'home' else 'away'}) vs {opponent}",
+        "game_date": request.game_date,
+        "location": location,
+        "moneyline": {
+            "win_probability": win_prob,
+            "predicted_win": predicted_win,
+            "recommendation": ml_rec,
+            "confidence": ml_conf,
+        },
+        "spread": {
+            "predicted_margin": round(predicted_margin, 1),
+            "predicted_spread": predicted_spread,
+            "cover_probability": cover_prob,
+            "predicted_cover": predicted_cover,
+            "recommendation": sp_rec,
+            "confidence": sp_conf,
+        },
+        "features_used": list(ml_data["feature_cols"]),
+        "raw_features": {k: round(v, 3) if isinstance(v, float) else v for k, v in features.items()},
+    }
+
+
+@app.get("/model-stats")
+async def model_stats():
+    """Get trained model performance metrics."""
+    results = {}
+    for name, label in [("ml_model.pkl", "moneyline"), ("spread_model.pkl", "spread")]:
+        path = os.path.join(MODELS_DIR, name)
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(os.path.join(MODELS_DIR, f"{label}_insights.json")) as f:
+                insights = json.load(f).get("insights", [])
+            results[label] = {"insights": insights}
+        except Exception:
+            results[label] = {}
+    return results
+
+
+@app.post("/teams/{team_code}/fetch")
+async def fetch_team_games(team_code: str, request: FetchRequest, background_tasks: BackgroundTasks):
+    """Fetch games for a team from basketball-reference.com."""
     from fetch_basketball_ref import NBA_TEAMS
 
     team_code = team_code.upper()
     if team_code not in NBA_TEAMS:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown team code: {team_code}. Valid codes: {list(NBA_TEAMS.keys())}",
+            detail=f"Unknown team code: {team_code}. Valid: {list(NBA_TEAMS.keys())}",
         )
 
-    # Check if already being fetched (simple check)
-    team_info = db.get_team_info(team_code)
-    if team_info and team_info.get("last_fetched"):
-        # Already fetched, but allow re-fetch
-        pass
-
     try:
-        # Fetch synchronously for now (could be made async)
         result = db.fetch_team_games(
             team_code=team_code,
             start_year=request.start_year,
             end_year=request.end_year,
             force_refresh=request.force_refresh,
         )
-
-        return {
-            "status": "complete",
-            "team": result["team"],
-            "team_name": result["team_name"],
-            "total_games_fetched": result["total_games_fetched"],
-            "total_games_saved": result["total_games_saved"],
-            "seasons": result["seasons"],
-        }
+        return result
     except Exception as e:
         logger.error(f"Error fetching games for {team_code}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -214,180 +297,51 @@ async def get_team_games(
     season_year: Optional[int] = None,
     limit: Optional[int] = None,
 ):
-    """Get games for a specific team."""
     team_code = team_code.upper()
-
     try:
         games = db.get_games(team=team_code, season_year=season_year, limit=limit)
-        return {
-            "team": team_code,
-            "count": len(games),
-            "games": games,
-        }
+        return {"team": team_code, "count": len(games), "games": games}
     except Exception as e:
         logger.error(f"Error fetching games for {team_code}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/predict")
-async def predict(request: PredictionRequest):
-    """Predict Celtics win based on game stats."""
-    location = request.location.lower()
-    if location == "home":
-        model = model_home
-        cols = feature_cols["home"]
-    elif location == "away":
-        model = model_away
-        cols = feature_cols["away"]
-    else:
-        return {"error": "Invalid location. Must be 'home' or 'away'."}, 400
-
-    return {
-        "team_code": request.team_code,
-        "location": request.location,
-        "win_prediction": bool(prediction),
-        "win_probability": float(probability[1]),
-        "loss_probability": float(probability[0]),
-    }
-
-
-@app.get("/game-stats")
-async def game_stats(team_code: str = Query(default="BOS")):
-    """Get game-by-game prediction statistics for a team."""
-    try:
-        team_preds_path = os.path.join(MODELS_DIR, f"{team_code}_predictions.csv")
-        default_preds_path = os.path.join(MODELS_DIR, "game_predictions.csv")
-
-        if os.path.exists(team_preds_path):
-            preds_path = team_preds_path
-            used_fallback = False
-        elif os.path.exists(default_preds_path):
-            preds_path = default_preds_path
-            used_fallback = True
-        else:
-            raise HTTPException(
-                status_code=404,
-                detail="No game predictions found. Train models first."
-            )
-
-        game_predictions = pd.read_csv(preds_path)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    if game_predictions.empty:
-        raise HTTPException(status_code=404, detail="No game predictions found")
-
-    # Calculate overall stats
-    home_games = game_predictions[game_predictions["location"] == "home"]
-    away_games = game_predictions[game_predictions["location"] == "away"]
-    
-    overall_accuracy = (game_predictions["correct"].sum() / len(game_predictions) * 100) if len(game_predictions) > 0 else 0.0
-    home_accuracy = (home_games["correct"].sum() / len(home_games) * 100) if len(home_games) > 0 else 0.0
-    away_accuracy = (away_games["correct"].sum() / len(away_games) * 100) if len(away_games) > 0 else 0.0
-    
-    # Get recent games sorted by date (most recent first)
-    recent_games = game_predictions.copy()
-    recent_games["date"] = pd.to_datetime(recent_games["date"], errors="coerce")
-    recent_games = recent_games.sort_values("date", ascending=False).head(20)
-    recent_games["date"] = recent_games["date"].dt.strftime("%Y-%m-%d")
-
-    # Round float columns
-    float_cols = ["pace", "ftr", "efg_pct", "tov_pct", "orb_pct", "win_prob"]
-    for col in float_cols:
-        if col in recent_games.columns:
-            recent_games[col] = recent_games[col].round(3)
-
-    recent_games = recent_games.where(pd.notna(recent_games), None)
-    recent_games = recent_games.to_dict("records")
-
-    # Load saved insights for this team
-    insights = []
-    insights_path = os.path.join(MODELS_DIR, f"{team_code}_insights.json")
-    if os.path.exists(insights_path):
-        try:
-            with open(insights_path) as f:
-                insights_data = json.load(f)
-                insights = insights_data.get("insights", [])
-        except Exception:
-            pass
-
-    return {
-        "overall_accuracy": float(overall_accuracy),
-        "home_accuracy": float(home_accuracy),
-        "away_accuracy": float(away_accuracy),
-        "total_games": len(game_predictions),
-        "home_games_count": len(home_games),
-        "away_games_count": len(away_games),
-        "recent_games": recent_games,
-        "used_fallback": used_fallback,
-        "team_code": team_code,
-        "insights": insights,
-    }
-
-
 @app.get("/db-stats")
 async def db_stats():
-    """Get statistics from the database."""
     try:
         teams = db.get_teams()
         total_games = sum(t.get("games_in_db", 0) for t in teams)
-
-        return {
-            "total_teams": len(teams),
-            "total_games": total_games,
-            "teams": teams,
-        }
+        return {"total_teams": len(teams), "total_games": total_games, "teams": teams}
     except Exception as e:
         logger.error(f"Error fetching DB stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 class TrainRequest(BaseModel):
-    team_code: str = Field(default="BOS", max_length=10)
-    season_year: Optional[int] = None
+    pass
 
 
 @app.post("/api/train")
-async def train_team(body: TrainRequest):
+async def train_models():
     """
-    Train prediction models for a team.
-
-    Uses chronological split: last 20 games are held out as test,
-    all older games are used for training.
-
-    Returns training and test accuracy metrics.
+    Retrain both moneyline and spread models.
+    Uses all available game data in the database.
     """
-    team_code = body.team_code.upper()
-    logger.info(f"Training models for {team_code} (season={body.season_year})")
+    logger.info("Training prediction models...")
 
     try:
-        # Check if we have games for this team
-        games = load_games_from_db(team_code=team_code, season_year=body.season_year)
-        if games.empty:
-            raise HTTPException(
-                status_code=400,
-                detail=f"No games found in database for {team_code}. Fetch data first."
-            )
-
-        # Run training (CPU-bound, runs in-process)
-        result = tm.train_models(
-            team_code=team_code,
-            season_year=body.season_year,
-            output_dir=MODELS_DIR,
-        )
+        result = tm.train_models(output_dir=MODELS_DIR, db_path=DATABASE_PATH)
 
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
 
-        logger.info(f"Training complete for {team_code}: {result}")
-        return result
+        logger.info(f"Training complete: {result}")
+        return {"status": "complete", "results": result}
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error training {team_code}: {e}")
+        logger.error(f"Error training models: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

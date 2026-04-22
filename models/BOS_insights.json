@@ -1,0 +1,136 @@
+{
+  "insights": [
+    {
+      "type": "rule",
+      "location": "home",
+      "feature": "pace",
+      "label": "Pace",
+      "direction": "higher",
+      "symbol": "\u2191",
+      "strength": "moderate",
+      "probChange": 2.4,
+      "typicalRange": "91.78\u2013101.52",
+      "description": "\u2191 Pace: moderate effect on win probability (\u00b12.4% for 1-SD change). Typical range: 91.78\u2013101.52."
+    },
+    {
+      "type": "rule",
+      "location": "home",
+      "feature": "ftr",
+      "label": "Free Throw Rate",
+      "direction": "higher",
+      "symbol": "\u2191",
+      "strength": "mild",
+      "probChange": 0.5,
+      "typicalRange": "0.097\u20130.245",
+      "description": "\u2191 Free Throw Rate: mild effect on win probability (\u00b10.5% for 1-SD change). Typical range: 0.097\u20130.245."
+    },
+    {
+      "type": "rule",
+      "location": "home",
+      "feature": "efg_pct",
+      "label": "Effective FG%",
+      "direction": "higher",
+      "symbol": "\u2191",
+      "strength": "mild",
+      "probChange": 1.9,
+      "typicalRange": "0.504\u20130.63",
+      "description": "\u2191 Effective FG%: mild effect on win probability (\u00b11.9% for 1-SD change). Typical range: 0.504\u20130.63."
+    },
+    {
+      "type": "rule",
+      "location": "home",
+      "feature": "tov_pct",
+      "label": "Turnover %",
+      "direction": "higher",
+      "symbol": "\u2191",
+      "strength": "mild",
+      "probChange": 0.0,
+      "typicalRange": "0.078\u20130.138",
+      "description": "\u2191 Turnover %: mild effect on win probability (\u00b10.0% for 1-SD change). Typical range: 0.078\u20130.138."
+    },
+    {
+      "type": "rule",
+      "location": "home",
+      "feature": "orb_pct",
+      "label": "Offensive Rebound %",
+      "direction": "higher",
+      "symbol": "\u2191",
+      "strength": "mild",
+      "probChange": 0.3,
+      "typicalRange": "0.181\u20130.331",
+      "description": "\u2191 Offensive Rebound %: mild effect on win probability (\u00b10.3% for 1-SD change). Typical range: 0.181\u20130.331."
+    },
+    {
+      "type": "rule",
+      "location": "away",
+      "feature": "pace",
+      "label": "Pace",
+      "direction": "lower",
+      "symbol": "\u2193",
+      "strength": "strong",
+      "probChange": 9.0,
+      "typicalRange": "91.78\u2013101.52",
+      "description": "\u2193 Pace: strong effect on win probability (\u00b19.0% for 1-SD change). Typical range: 91.78\u2013101.52."
+    },
+    {
+      "type": "rule",
+      "location": "away",
+      "feature": "ftr",
+      "label": "Free Throw Rate",
+      "direction": "higher",
+      "symbol": "\u2191",
+      "strength": "mild",
+      "probChange": 0.2,
+      "typicalRange": "0.097\u20130.245",
+      "description": "\u2191 Free Throw Rate: mild effect on win probability (\u00b10.2% for 1-SD change). Typical range: 0.097\u20130.245."
+    },
+    {
+      "type": "rule",
+      "location": "away",
+      "feature": "efg_pct",
+      "label": "Effective FG%",
+      "direction": "higher",
+      "symbol": "\u2191",
+      "strength": "mild",
+      "probChange": 1.9,
+      "typicalRange": "0.504\u20130.63",
+      "description": "\u2191 Effective FG%: mild effect on win probability (\u00b11.9% for 1-SD change). Typical range: 0.504\u20130.63."
+    },
+    {
+      "type": "rule",
+      "location": "away",
+      "feature": "tov_pct",
+      "label": "Turnover %",
+      "direction": "lower",
+      "symbol": "\u2193",
+      "strength": "mild",
+      "probChange": 0.0,
+      "typicalRange": "0.078\u20130.138",
+      "description": "\u2193 Turnover %: mild effect on win probability (\u00b10.0% for 1-SD change). Typical range: 0.078\u20130.138."
+    },
+    {
+      "type": "rule",
+      "location": "away",
+      "feature": "orb_pct",
+      "label": "Offensive Rebound %",
+      "direction": "higher",
+      "symbol": "\u2191",
+      "strength": "mild",
+      "probChange": 0.3,
+      "typicalRange": "0.181\u20130.331",
+      "description": "\u2191 Offensive Rebound %: mild effect on win probability (\u00b10.3% for 1-SD change). Typical range: 0.181\u20130.331."
+    },
+    {
+      "type": "baseline",
+      "location": "home",
+      "baseWinProb": 6.2,
+      "description": "Home win probability when all factors are at median: 6.2%"
+    },
+    {
+      "type": "baseline",
+      "location": "away",
+      "baseWinProb": 99.8,
+      "description": "Away win probability when all factors are at median: 99.8%"
+    }
+  ]
+}
