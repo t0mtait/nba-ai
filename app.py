@@ -231,19 +231,37 @@ async def get_team_games(
 
 @app.post("/predict")
 async def predict(request: PredictionRequest):
-    """Predict Celtics win based on game stats."""
+    """Predict win based on game stats."""
+    team_code = request.team_code.upper()
+
+    try:
+        model_home, model_away, feature_cols = _load_models_for_team(team_code)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
     location = request.location.lower()
+
     if location == "home":
         model = model_home
-        cols = feature_cols["home"]
     elif location == "away":
         model = model_away
-        cols = feature_cols["away"]
     else:
-        return {"error": "Invalid location. Must be 'home' or 'away'."}, 400
+        raise HTTPException(status_code=400, detail="Invalid location. Must be 'home' or 'away'.")
+
+    if model is None:
+        raise HTTPException(status_code=500, detail=f"No {location} model found for {team_code}. Train the model first.")
+
+    try:
+        features = pd.DataFrame([[request.pace, request.ftr, request.efg_pct, request.tov_pct, request.orb_pct]],
+                                columns=["pace", "ftr", "efg_pct", "tov_pct", "orb_pct"])
+        prediction = model.predict(features)[0]
+        probability = model.predict_proba(features)[0]
+    except Exception as e:
+        logger.error(f"Prediction error: {e}")
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {e}")
 
     return {
-        "team_code": request.team_code,
+        "team_code": team_code,
         "location": request.location,
         "win_prediction": bool(prediction),
         "win_probability": float(probability[1]),
