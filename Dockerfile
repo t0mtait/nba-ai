@@ -15,6 +15,7 @@ COPY app.py .
 COPY data_loader.py .
 COPY db.py .
 COPY fetch_basketball_ref.py .
+COPY fetch_all.py .
 COPY train_models.py .
 COPY index.html .
 COPY models/ ./models/
