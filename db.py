@@ -274,8 +274,9 @@ def get_games(team: Optional[str] = None, season_year: Optional[int] = None,
         query += " AND season_year = ?"
         params.append(season_year)
     query += " ORDER BY date DESC"
-    if limit:
-        query += f" LIMIT {limit}"
+    if limit and limit > 0:
+        query += " LIMIT ?"
+        params.append(int(limit))
     cursor.execute(query, params)
     rows = cursor.fetchall()
     conn.close()
@@ -300,8 +301,9 @@ def get_matchups(team: Optional[str] = None, opponent: Optional[str] = None,
         query += " AND season_year = ?"
         params.append(season_year)
     query += " ORDER BY date DESC"
-    if limit:
-        query += f" LIMIT {limit}"
+    if limit and limit > 0:
+        query += " LIMIT ?"
+        params.append(int(limit))
     cursor.execute(query, params)
     rows = cursor.fetchall()
     conn.close()
