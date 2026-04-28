@@ -121,7 +121,8 @@ async def root():
 async def health():
     """Health check endpoint - reports whether models are loaded."""
     try:
-        _load_models()
+        # Try loading models for default team (BOS) as a health check
+        _load_models_for_team("BOS")
         return {
             "status": "healthy",
             "models_loaded": True,
