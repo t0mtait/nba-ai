@@ -1,0 +1,16 @@
+{
+  "insights": [
+    {
+      "feature": "home_court_adv",
+      "direction": "increases",
+      "coefficient": 0.311,
+      "description": "Home Court Adv increases win probability"
+    },
+    {
+      "feature": "h2h_win_pct_diff",
+      "direction": "increases",
+      "coefficient": 0.077,
+      "description": "H2H Win Pct Diff increases win probability"
+    }
+  ]
+}

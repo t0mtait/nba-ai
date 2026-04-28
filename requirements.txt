@@ -9,3 +9,4 @@ pydantic==2.9.0
 requests
 beautifulsoup4
 lxml
+nba_api

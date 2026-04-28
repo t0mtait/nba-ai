@@ -1,91 +1,66 @@
-"""FastAPI backend for NBA moneyline and spread predictions."""
+"""FastAPI backend for NBA tonight's games predictions."""
 from __future__ import annotations
 
 import os
-import json
 import logging
+import pickle
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel
 import pandas as pd
-import pickle
 
 import db
 import train_models as tm
-from data_loader import load_games_from_db
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(
-    title="NBA Prediction API",
-    description="Predict NBA moneyline and point spread outcomes for any matchup",
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI(title="NBA Tonight's Games", description="ML-powered predictions")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 MODELS_DIR = os.environ.get("MODELS_DIR", "models")
 DATABASE_PATH = os.environ.get("DATABASE_PATH", os.path.join(os.path.dirname(__file__), "nba.db"))
 
 
 def _load_model(name: str) -> dict:
-    """Load a model + scaler bundle from disk."""
     path = os.path.join(MODELS_DIR, name)
     if not os.path.exists(path):
-        raise FileNotFoundError(f"Model not found: {path}. Run train_models.py first.")
+        raise FileNotFoundError(f"Model not found: {path}")
     with open(path, "rb") as f:
         return pickle.load(f)
 
 
-def _get_or_compute_features(
-    team: str,
-    opponent: str,
-    game_date: str,
-    location: str,
-    db_path: Optional[str] = None,
-) -> dict:
-    """Get cached features or build them on the fly."""
-    return tm.build_features_for_game(team, opponent, game_date, location, db_path)
+# ---- Pydantic models ----
+
+class PowerRankingEntry(BaseModel):
+    team: str
+    rank: int
+    power_rating: float = 0.0
+    net_rtg: float = 0.0
+    ortg_override: Optional[float] = None
+    drtg_override: Optional[float] = None
+    notes: str = ""
 
 
-# ----- Pydantic models -----
-
-class PredictionRequest(BaseModel):
-    team: str = Field(..., description="Team code (e.g. BOS, LAL)")
-    opponent: str = Field(..., description="Opponent team code")
-    game_date: str = Field(..., description="Game date (YYYY-MM-DD)")
-    location: str = Field(..., description="'home' or 'away'")
-
-    @field_validator("team", "opponent")
-    @classmethod
-    def validate_team_code(cls, v: str) -> str:
-        return v.upper()
-
-    @field_validator("location")
-    @classmethod
-    def validate_location(cls, v: str) -> str:
-        if v.lower() not in ("home", "away"):
-            raise ValueError("location must be 'home' or 'away'")
-        return v.lower()
+class PowerRankingRequest(BaseModel):
+    season_year: int
+    entries: list[PowerRankingEntry]
 
 
-class FetchRequest(BaseModel):
-    start_year: int = Field(default=2017, ge=2000, le=2030)
-    end_year: int = Field(default=2026, ge=2000, le=2030)
-    force_refresh: bool = Field(default=False)
+class InjuryRequest(BaseModel):
+    team: str
+    player_name: str
+    injury: str = ""
+    status: str = "questionable"
+    date_reported: str = ""
+    game_date: str = ""
+    season_year: Optional[int] = None
 
 
-# ----- Routes -----
+# ---- Routes ----
 
 @app.get("/")
 async def root():
@@ -94,255 +69,299 @@ async def root():
 
 @app.get("/health")
 async def health():
-    ml_exists = os.path.exists(os.path.join(MODELS_DIR, "ml_model.pkl"))
-    sp_exists = os.path.exists(os.path.join(MODELS_DIR, "spread_model.pkl"))
-    return {
-        "status": "healthy" if (ml_exists and sp_exists) else "unhealthy",
-        "moneyline_model": ml_exists,
-        "spread_model": sp_exists,
-        "database": os.path.exists(DATABASE_PATH),
-    }
+    ml = os.path.exists(os.path.join(MODELS_DIR, "ml_model.pkl"))
+    sp = os.path.exists(os.path.join(MODELS_DIR, "spread_model.pkl"))
+    return {"status": "healthy" if (ml and sp) else "unhealthy",
+             "moneyline_model": ml, "spread_model": sp,
+             "database": os.path.exists(DATABASE_PATH)}
 
 
-@app.get("/teams")
-async def list_teams():
+# --- Tonight's Games ---
+
+@app.get("/tonight")
+async def get_tonight():
     try:
-        return db.get_teams()
+        games = db.get_tonight_games()
+        return {"games": games, "count": len(games)}
     except Exception as e:
-        logger.error(f"Error fetching teams: {e}")
+        logger.error(f"Error fetching tonight's games: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/teams/{team_code}")
-async def get_team(team_code: str):
-    team = db.get_team_info(team_code.upper())
-    if not team:
-        raise HTTPException(status_code=404, detail=f"Team {team_code} not found")
-    return team
+@app.get("/predictions")
+async def get_predictions():
+    try:
+        games = db.get_tonight_games()
+    except Exception as e:
+        logger.error(f"Error fetching today's games: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
+    if not games:
+        return {"predictions": [], "count": 0}
 
-@app.get("/teams/{team_code}/stats/{season_year}")
-async def get_team_stats(team_code: str, season_year: int):
-    stats = db.get_team_stats(team_code.upper(), season_year)
-    if not stats:
-        raise HTTPException(status_code=404, detail=f"No stats found for {team_code} in {season_year}")
-    return stats
-
-
-@app.get("/teams/{team_code}/injuries")
-async def get_team_injuries(team_code: str):
-    injuries = db.get_injuries(team=team_code.upper())
-    return {"team": team_code.upper(), "injuries": injuries}
-
-
-@app.get("/matchups/{team}/vs/{opponent}")
-async def get_matchup_history(team: str, opponent: str, limit: int = Query(default=20)):
-    team = team.upper()
-    opponent = opponent.upper()
-    games = db.get_recent_matchup(team, opponent, n=limit)
-    return {
-        "matchup": f"{team} vs {opponent}",
-        "team": team,
-        "opponent": opponent,
-        "count": len(games),
-        "games": games,
-    }
-
-
-@app.post("/predict")
-async def predict(request: PredictionRequest):
-    """
-    Predict moneyline and spread for a given matchup.
-    Returns win probability, predicted margin, and recommended bet.
-    """
-    team = request.team.upper()
-    opponent = request.opponent.upper()
-    location = request.location.lower()
-
-    # Load models
     try:
         ml_data = _load_model("ml_model.pkl")
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail="Model not trained. POST /api/train first.")
+
+    sp_data, reg_data = None, None
+    try:
         sp_data = _load_model("spread_model.pkl")
         reg_data = _load_model("spread_reg.pkl")
-    except FileNotFoundError as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Models not loaded: {e}. Run train_models.py first.",
-        )
+    except FileNotFoundError:
+        pass
 
-    # Build features
-    features = _get_or_compute_features(team, opponent, request.game_date, location)
-    feature_vec = pd.DataFrame([features])[ml_data["feature_cols"]].fillna(0)
-    feature_vec_scaled = ml_data["scaler"].transform(feature_vec)
+    predictions = []
+    for game in games:
+        home_team = game["home_team"]
+        away_team = game["away_team"]
+        game_date = game["game_date"]
+        game_id = game["game_id"]
+        game_time = game.get("game_time", "")
+        status_id = game.get("status_id", 1)
 
-    # Moneyline prediction
-    ml_model = ml_data["model"]
-    win_prob = float(ml_model.predict_proba(feature_vec_scaled)[0][1])
-    predicted_win = bool(ml_model.predict(feature_vec_scaled)[0])
-
-    # Spread regression (predicted margin in points)
-    reg = reg_data["model"]
-    predicted_margin = float(reg.predict(feature_vec_scaled)[0])
-
-    # Spread classification (will team cover?)
-    sp_model = sp_data["model"]
-    cover_prob = float(sp_model.predict_proba(feature_vec_scaled)[0][1])
-    predicted_cover = bool(sp_model.predict(feature_vec_scaled)[0])
-
-    # Adjust for home/away
-    if location == "home":
-        predicted_spread = round(-predicted_margin, 1)
-    else:
-        predicted_spread = round(predicted_margin, 1)
-
-    # Clamp spread to typical NBA range (-15 to +15)
-    predicted_spread = max(-15, min(15, predicted_spread))
-
-    # Moneyline recommendation
-    if win_prob > 0.55:
-        ml_rec = f"BET {team}"
-        ml_conf = "high" if win_prob > 0.65 else "medium"
-    elif win_prob < 0.45:
-        ml_rec = f"BET {opponent}"
-        ml_conf = "high" if win_prob < 0.35 else "medium"
-    else:
-        ml_rec = "PASS"
-        ml_conf = None
-
-    # Spread recommendation
-    if cover_prob > 0.55:
-        if location == "home":
-            sp_rec = f"BET {team} -{abs(predicted_spread)}"
-        else:
-            sp_rec = f"BET {team} +{abs(predicted_spread)}"
-        sp_conf = "high" if cover_prob > 0.65 else "medium"
-    elif cover_prob < 0.45:
-        if location == "home":
-            sp_rec = f"BET {opponent} +{abs(predicted_spread)}"
-        else:
-            sp_rec = f"BET {opponent} -{abs(predicted_spread)}"
-        sp_conf = "high" if cover_prob < 0.35 else "medium"
-    else:
-        sp_rec = "PASS"
-        sp_conf = None
-
-    return {
-        "matchup": f"{team} ({'home' if location == 'home' else 'away'}) vs {opponent}",
-        "game_date": request.game_date,
-        "location": location,
-        "moneyline": {
-            "win_probability": win_prob,
-            "predicted_win": predicted_win,
-            "recommendation": ml_rec,
-            "confidence": ml_conf,
-        },
-        "spread": {
-            "predicted_margin": round(predicted_margin, 1),
-            "predicted_spread": predicted_spread,
-            "cover_probability": cover_prob,
-            "predicted_cover": predicted_cover,
-            "recommendation": sp_rec,
-            "confidence": sp_conf,
-        },
-        "features_used": list(ml_data["feature_cols"]),
-        "raw_features": {k: round(v, 3) if isinstance(v, float) else v for k, v in features.items()},
-    }
-
-
-@app.get("/model-stats")
-async def model_stats():
-    """Get trained model performance metrics."""
-    results = {}
-    for name, label in [("ml_model.pkl", "moneyline"), ("spread_model.pkl", "spread")]:
-        path = os.path.join(MODELS_DIR, name)
-        if not os.path.exists(path):
+        if status_id == 3:
+            predictions.append({
+                "game_id": game_id, "game_date": game_date, "game_time": game_time,
+                "home_team": home_team, "away_team": away_team, "status": "completed",
+                "home_score": game.get("home_score"), "away_score": game.get("away_score"),
+            })
             continue
-        try:
-            with open(os.path.join(MODELS_DIR, f"{label}_insights.json")) as f:
-                insights = json.load(f).get("insights", [])
-            results[label] = {"insights": insights}
-        except Exception:
-            results[label] = {}
-    return results
+
+        # Home perspective
+        home_feats = tm.build_features_for_game(home_team, away_team, game_date, "home")
+        home_vec = pd.DataFrame([home_feats])[ml_data["feature_cols"]].fillna(0)
+        home_vec_s = ml_data["scaler"].transform(home_vec)
+        home_win_prob = float(ml_data["model"].predict_proba(home_vec_s)[0][1])
+        home_pred_margin = float(reg_data["model"].predict(home_vec_s)[0]) if reg_data else 0.0
+        home_cover_prob = float(sp_data["model"].predict_proba(home_vec_s)[0][1]) if sp_data else 0.5
+
+        # Away perspective
+        away_feats = tm.build_features_for_game(away_team, home_team, game_date, "away")
+        away_vec = pd.DataFrame([away_feats])[ml_data["feature_cols"]].fillna(0)
+        away_vec_s = ml_data["scaler"].transform(away_vec)
+        away_win_prob = float(ml_data["model"].predict_proba(away_vec_s)[0][1])
+
+        pred_spread = round(-home_pred_margin, 1)
+        pred_spread = max(-15, min(15, pred_spread))
+
+        def ml_rec(team, prob):
+            if prob > 0.55:
+                return f"BET {team}", "medium" if prob < 0.65 else "high"
+            elif prob < 0.45:
+                return f"BET {team}", "medium" if prob > 0.35 else "high"
+            return "PASS", None
+
+        home_ml_rec, home_ml_conf = ml_rec(home_team, home_win_prob)
+        away_ml_rec, away_ml_conf = ml_rec(away_team, away_win_prob)
+
+        if sp_data:
+            def spread_rec(home_prob):
+                if home_prob > 0.55:
+                    return f"BET {home_team} -{abs(pred_spread)}", "medium" if home_prob < 0.65 else "high"
+                elif home_prob < 0.45:
+                    return f"BET {away_team} +{abs(pred_spread)}", "medium" if home_prob > 0.35 else "high"
+                return "PASS", None
+            sp_rec_str, sp_conf = spread_rec(home_cover_prob)
+        else:
+            sp_rec_str, sp_conf = "N/A", None
+
+        predictions.append({
+            "game_id": game_id, "game_date": game_date, "game_time": game_time,
+            "status": "scheduled", "home_team": home_team, "away_team": away_team,
+            "moneyline": {
+                "home": {"win_probability": round(home_win_prob, 3), "predicted_win": home_win_prob > 0.5,
+                         "recommendation": home_ml_rec, "confidence": home_ml_conf},
+                "away": {"win_probability": round(away_win_prob, 3), "predicted_win": away_win_prob > 0.5,
+                         "recommendation": away_ml_rec, "confidence": away_ml_conf},
+            },
+            "spread": {
+                "predicted_spread": pred_spread,
+                "home_cover_probability": round(home_cover_prob, 3),
+                "recommendation": sp_rec_str,
+                "confidence": sp_conf,
+            } if sp_data else None,
+        })
+
+    return {"predictions": predictions, "count": len(predictions)}
 
 
-@app.post("/teams/{team_code}/fetch")
-async def fetch_team_games(team_code: str, request: FetchRequest, background_tasks: BackgroundTasks):
-    """Fetch games for a team from basketball-reference.com."""
-    from fetch_basketball_ref import NBA_TEAMS
-
-    team_code = team_code.upper()
-    if team_code not in NBA_TEAMS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown team code: {team_code}. Valid: {list(NBA_TEAMS.keys())}",
-        )
-
-    try:
-        result = db.fetch_team_games(
-            team_code=team_code,
-            start_year=request.start_year,
-            end_year=request.end_year,
-            force_refresh=request.force_refresh,
-        )
-        return result
-    except Exception as e:
-        logger.error(f"Error fetching games for {team_code}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/teams/{team_code}/games")
-async def get_team_games(
-    team_code: str,
-    season_year: Optional[int] = None,
-    limit: Optional[int] = None,
-):
-    team_code = team_code.upper()
-    try:
-        games = db.get_games(team=team_code, season_year=season_year, limit=limit)
-        return {"team": team_code, "count": len(games), "games": games}
-    except Exception as e:
-        logger.error(f"Error fetching games for {team_code}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/db-stats")
-async def db_stats():
-    try:
-        teams = db.get_teams()
-        total_games = sum(t.get("games_in_db", 0) for t in teams)
-        return {"total_teams": len(teams), "total_games": total_games, "teams": teams}
-    except Exception as e:
-        logger.error(f"Error fetching DB stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-class TrainRequest(BaseModel):
-    pass
-
+# --- Training ---
 
 @app.post("/api/train")
 async def train_models():
-    """
-    Retrain both moneyline and spread models.
-    Uses all available game data in the database.
-    """
-    logger.info("Training prediction models...")
-
+    logger.info("Training models...")
     try:
         result = tm.train_models(output_dir=MODELS_DIR, db_path=DATABASE_PATH)
-
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
-
-        logger.info(f"Training complete: {result}")
         return {"status": "complete", "results": result}
-
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error training models: {e}")
+        logger.error(f"Training error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/backtest")
+async def backtest():
+    """Backtest the model on historical games."""
+    try:
+        result = tm.backtest(db_path=DATABASE_PATH, models_dir=MODELS_DIR)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Backtest error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Power Rankings ---
+
+@app.get("/api/power-rankings")
+async def get_power_rankings():
+    """Get all power rankings."""
+    rankings = db.get_all_power_rankings(db_path=DATABASE_PATH)
+    return {"rankings": rankings, "count": len(rankings)}
+
+
+@app.get("/api/power-rankings/{season_year}")
+async def get_power_ranking(season_year: int):
+    """Get latest power ranking for a season."""
+    ranking = db.get_latest_power_ranking(season_year, db_path=DATABASE_PATH)
+    if not ranking:
+        return {"season_year": season_year, "entries": [], "message": "No power ranking found"}
+    return ranking
+
+
+@app.post("/api/power-rankings")
+async def save_power_ranking(req: PowerRankingRequest):
+    """Save a power ranking for a season."""
+    try:
+        entries = [e.model_dump() for e in req.entries]
+        ranking_id = db.save_power_ranking(req.season_year, entries)
+        return {"status": "saved", "ranking_id": ranking_id, "season_year": req.season_year,
+                "count": len(entries)}
+    except Exception as e:
+        logger.error(f"Error saving power ranking: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/power-rankings/{season_year}")
+async def delete_power_ranking(season_year: int):
+    """Delete the latest power ranking for a season."""
+    conn = db.get_connection(db_path=DATABASE_PATH)
+    cur = conn.cursor()
+    cur.execute("""
+        DELETE FROM power_ranking_entries
+        WHERE ranking_id IN (SELECT id FROM power_rankings WHERE season_year = ?)
+    """, (season_year,))
+    cur.execute("DELETE FROM power_rankings WHERE season_year = ?", (season_year,))
+    conn.commit()
+    conn.close()
+    return {"status": "deleted", "season_year": season_year}
+
+
+# --- Injuries ---
+
+@app.get("/api/injuries")
+async def get_injuries(team: Optional[str] = None):
+    """Get injury reports, optionally filtered by team."""
+    injuries = db.get_injuries(team=team, db_path=DATABASE_PATH)
+    return {"injuries": injuries, "count": len(injuries)}
+
+
+@app.post("/api/injuries")
+async def add_injury(req: InjuryRequest):
+    """Add an injury report."""
+    try:
+        year = req.season_year or int(req.date_reported[:4]) if req.date_reported else None
+        saved = db.save_injuries([req.model_dump()], req.team, db_path=DATABASE_PATH)
+        return {"status": "saved", "team": req.team, "saved": saved}
+    except Exception as e:
+        logger.error(f"Error saving injury: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/injuries/{injury_id}")
+async def delete_injury(injury_id: int):
+    """Delete an injury record."""
+    conn = db.get_connection(db_path=DATABASE_PATH)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM injuries WHERE id = ?", (injury_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "deleted", "id": injury_id}
+
+
+@app.post("/api/injuries/fetch")
+async def fetch_injuries():
+    """
+    Fetch current NBA injury reports from ESPN and save to database.
+    Auto-maps team names to codes and stores all active injuries.
+    """
+    try:
+        injuries = db.fetch_injuries_from_espn()
+        if not injuries:
+            return {"status": "no_data", "saved": 0, "message": "No injuries found or fetch failed"}
+
+        # Group by team and save
+        from collections import defaultdict
+        by_team = defaultdict(list)
+        for inj in injuries:
+            by_team[inj['team']].append(inj)
+
+        total_saved = 0
+        for team_code, team_injuries in by_team.items():
+            saved = db.save_injuries(team_injuries, team_code, db_path=DATABASE_PATH)
+            total_saved += saved
+
+        return {
+            "status": "complete",
+            "fetched": len(injuries),
+            "saved": total_saved,
+            "teams_updated": list(by_team.keys()),
+        }
+    except Exception as e:
+        logger.error(f"Error fetching injuries: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.patch("/api/injuries/{injury_id}")
+async def update_injury_will_play(injury_id: int, will_play: int = 1):
+    """
+    Update the will_play flag for an injury record.
+    will_play=1: user predicts player WILL play despite injury (no impact penalty)
+    will_play=0: user predicts player WILL miss (full impact penalty applies)
+    """
+    conn = db.get_connection(db_path=DATABASE_PATH)
+    cur = conn.cursor()
+    cur.execute("UPDATE injuries SET will_play = ? WHERE id = ?", (will_play, injury_id))
+    conn.commit()
+    rows_affected = cur.rowcount
+    conn.close()
+    if rows_affected == 0:
+        raise HTTPException(status_code=404, detail="Injury record not found")
+    return {"status": "updated", "id": injury_id, "will_play": will_play}
+
+
+# --- H2H ---
+
+@app.get("/api/h2h/{team}/vs/{opponent}")
+async def get_h2h(team: str, opponent: str, limit: int = 20):
+    """Get head-to-head history."""
+    cur_season = 2026  # this will be dynamic in real usage
+    games = db.get_recent_matchup(team.upper(), opponent.upper(), n=limit, db_path=DATABASE_PATH)
+    # Split into this season and last season
+    this_s = [g for g in games if g.get("season_year") == cur_season]
+    last_s = [g for g in games if g.get("season_year") == cur_season - 1]
+    return {
+        "matchup": f"{team.upper()} vs {opponent.upper()}",
+        "total_games": len(games),
+        "this_season": this_s, "last_season": last_s,
+    }
 
 
 if __name__ == "__main__":
