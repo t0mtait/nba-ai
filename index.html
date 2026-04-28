@@ -3,1463 +3,582 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="ML-powered NBA game win predictor using historical team statistics. Predict game outcomes for the Celtics and other NBA teams.">
-    <meta name="theme-color" content="#0a0a0f">
-    <meta property="og:title" content="NBA Win Predictor">
-    <meta property="og:description" content="ML-powered NBA game win prediction using advanced team statistics">
-    <meta property="og:type" content="website">
-    <title>NBA Win Predictor</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <title>NBA Predictions</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --bg: #0a0a0f;
-            --card: #111118;
-            --card-hover: #16161d;
-            --border: rgba(255, 255, 255, 0.08);
-            --border-active: rgba(255, 255, 255, 0.15);
-            --text: #f0f0f5;
-            --text-muted: #888899;
-            --text-dim: #555566;
-            --green: #3ecf6a;
-            --green-dim: rgba(62, 207, 106, 0.15);
-            --red: #ef4444;
-            --red-dim: rgba(239, 68, 68, 0.15);
-            --blue: #3b82f6;
-            --blue-dim: rgba(59, 130, 246, 0.2);
-            --radius: 16px;
-            --radius-sm: 10px;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            line-height: 1.5;
-        }
-
-        /* Header */
-        .header {
-            padding: 24px 24px 16px;
-            text-align: center;
-            border-bottom: 1px solid var(--border);
-            background: linear-gradient(180deg, rgba(17, 17, 24, 0.8) 0%, transparent 100%);
-        }
-
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-            margin-bottom: 4px;
-        }
-
-        .logo span {
-            color: var(--green);
-        }
-
-        .tagline {
-            color: var(--text-muted);
-            font-size: 0.85rem;
-        }
-
-        /* Main Container */
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 24px;
-            overflow: hidden;
-        }
-
-        /* Team Selector Bar */
-        .team-bar {
-            display: flex;
-            gap: 16px;
-            align-items: center;
-            flex-wrap: wrap;
-            padding: 20px 24px;
-            background: var(--card);
-            border-radius: var(--radius);
-            border: 1px solid var(--border);
-            margin-bottom: 24px;
-            overflow: hidden;
-        }
-
-        .team-bar-left {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            flex: 1;
-            min-width: 300px;
-            min-width: 0;
-        }
-
-        .team-badge {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: var(--green-dim);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 800;
-            font-size: 1rem;
-            color: var(--green);
-            border: 2px solid var(--green);
-            flex-shrink: 0;
-        }
-
-        .team-select-wrap {
-            flex: 1;
-        }
-
-        .team-select {
-            width: 100%;
-            padding: 12px 16px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text);
-            font-size: 1rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888899' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 16px center;
-            padding-right: 40px;
-        }
-
-        .team-select:focus {
-            outline: none;
-            border-color: var(--green);
-            box-shadow: 0 0 0 3px var(--green-dim);
-        }
-
-        .fetch-btn {
-            padding: 12px 24px;
-            background: linear-gradient(135deg, var(--blue), #2563eb);
-            color: white;
-            border: none;
-            border-radius: var(--radius-sm);
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            white-space: nowrap;
-        }
-
-        .fetch-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
-        }
-
-        .fetch-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .season-select {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .season-select span {
-            color: var(--text-muted);
-            font-size: 0.85rem;
-        }
-
-        .season-input {
-            width: 90px;
-            padding: 8px 8px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text);
-            font-size: 0.9rem;
-            text-align: center;
-            appearance: textfield;
-        }
-
-        .season-input:focus {
-            outline: none;
-            border-color: var(--green);
-        }
-
-        .fetch-status {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 16px;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: var(--radius-sm);
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        .fetch-status.hidden {
-            display: none;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--text-muted);
-        }
-
-        .status-dot.active {
-            background: var(--green);
-        }
-
-        .status-dot.loading {
-            background: #f59e0b;
-            animation: pulse 1s infinite;
-        }
-
-        .status-dot.training {
-            background: #f59e0b;
-            animation: pulse 1s infinite;
-        }
-
-        /* Grid Layout */
-        .main-grid {
-            display: grid;
-            gap: 24px;
-            grid-template-columns: 1fr;
-        }
-
-        @media (min-width: 1100px) {
-            .main-grid {
-                grid-template-columns: 420px 1fr;
-            }
-        }
-
-        /* Cards */
-        .card {
-            background: var(--card);
-            border-radius: var(--radius);
-            border: 1px solid var(--border);
-            padding: 24px;
-        }
-
-        .card-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 20px;
-        }
-
-        .card-icon {
-            font-size: 1rem;
-        }
-
-        .card-title {
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--text);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .card-title svg {
-            width: 20px;
-            height: 20px;
-            color: var(--green);
-        }
-
-        /* Stats Cards */
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .stat-card {
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: var(--radius-sm);
-            padding: 16px;
-            text-align: center;
-            border: 1px solid var(--border);
-        }
-
-        .stat-value {
-            font-size: 1.75rem;
-            font-weight: 800;
-            color: var(--green);
-            line-height: 1.2;
-        }
-
-        .stat-value.red {
-            color: var(--red);
-        }
-
-        .stat-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-top: 4px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .stat-count {
-            font-size: 0.7rem;
-            color: var(--text-dim);
-            margin-top: 2px;
-        }
-
-        /* Prediction Panel */
-        .prediction-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .location-toggle {
-            display: flex;
-            gap: 8px;
-        }
-
-        .location-btn {
-            flex: 1;
-            padding: 12px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text);
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .location-btn.active {
-            background: var(--green-dim);
-            border-color: var(--green);
-            color: var(--green);
-        }
-
-        .location-btn:hover:not(.active) {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        /* Big Result Display */
-        .result-display {
-            background: rgba(255, 255, 255, 0.02);
-            border-radius: var(--radius);
-            padding: 24px;
-            text-align: center;
-            border: 1px solid var(--border);
-            display: none;
-        }
-
-        .result-display.show {
-            display: block;
-            animation: fadeIn 0.3s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .result-label {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 8px;
-        }
-
-        .result-outcome {
-            font-size: 2.5rem;
-            font-weight: 900;
-            line-height: 1.1;
-        }
-
-        .result-outcome.win {
-            color: var(--green);
-        }
-
-        .result-outcome.loss {
-            color: var(--red);
-        }
-
-        .result-team {
-            font-size: 1rem;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-
-        /* Probability Bars */
-        .prob-section {
-            margin-top: 20px;
-        }
-
-        .prob-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-
-        .prob-label {
-            width: 60px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: var(--text-muted);
-        }
-
-        .prob-bar {
-            flex: 1;
-            height: 32px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .prob-fill {
-            height: 100%;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            padding-right: 12px;
-            font-size: 0.85rem;
-            font-weight: 700;
-            color: white;
-            min-width: 45px;
-            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .prob-fill.win {
-            background: linear-gradient(90deg, var(--green), #2eb85c);
-        }
-
-        .prob-fill.loss {
-            background: linear-gradient(90deg, var(--red), #dc2626);
-        }
-
-        /* Input Form */
-        .input-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-        }
-
-        @media (max-width: 500px) {
-            .input-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .input-label {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            font-weight: 500;
-        }
-
-        .input-field {
-            box-sizing: border-box;
-            width: 100%;
-            padding: 10px 12px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text);
-            font-size: 0.9rem;
-            font-weight: 600;
-            transition: all 0.2s;
-        }
-
-        .input-field:focus {
-            outline: none;
-            border-color: var(--green);
-            background: rgba(255, 255, 255, 0.08);
-            box-shadow: 0 0 0 3px var(--green-dim);
-        }
-
-        .input-field::placeholder {
-            color: var(--text-dim);
-            font-weight: 400;
-        }
-
-        /* Live Indicator */
-        .live-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
-            background: var(--green-dim);
-            border-radius: 20px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: var(--green);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .live-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--green);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
-        }
-
-        /* Loading Spinner */
-        .spinner-wrap {
-            display: none;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .spinner-wrap.show {
-            display: flex;
-        }
-
-        .spinner {
-            width: 32px;
-            height: 32px;
-            border: 3px solid rgba(255, 255, 255, 0.1);
-            border-top-color: var(--green);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Error */
-        .error-msg {
-            display: none;
-            padding: 12px 16px;
-            background: var(--red-dim);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            border-radius: var(--radius-sm);
-            color: var(--red);
-            font-size: 0.85rem;
-        }
-
-        .error-msg.show {
-            display: block;
-        }
-
-        /* Games Table */
-        .games-section {
-            margin-top: 24px;
-        }
-
-        .table-wrap {
-            overflow-x: auto;
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border);
-        }
-
-        .games-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
-        }
-
-        .games-table th {
-            padding: 14px 16px;
-            text-align: left;
-            font-weight: 600;
-            color: var(--text-muted);
-            background: rgba(255, 255, 255, 0.03);
-            border-bottom: 1px solid var(--border);
-            white-space: nowrap;
-            text-transform: uppercase;
-            font-size: 0.7rem;
-            letter-spacing: 0.5px;
-        }
-
-        .games-table td {
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--border);
-            color: var(--text);
-        }
-
-        .games-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .games-table tr:hover td {
-            background: rgba(255, 255, 255, 0.02);
-        }
-
-        .games-table .num {
-            font-variant-numeric: tabular-nums;
-        }
-
-        .loc-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 700;
-            background: var(--blue-dim);
-            color: var(--blue);
-        }
-
-        .res-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 700;
-        }
-
-        .res-badge.win {
-            background: var(--green-dim);
-            color: var(--green);
-        }
-
-        .res-badge.loss {
-            background: var(--red-dim);
-            color: var(--red);
-        }
-
-        .correct-badge {
-            color: var(--green);
-            font-weight: 700;
-        }
-
-        .incorrect-badge {
-            color: var(--red);
-            font-weight: 700;
-        }
-
-        .no-data {
-            text-align: center;
-            color: var(--text-muted);
-            padding: 40px !important;
-        }
-
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--text-muted);
-        }
-
-        .empty-state svg {
-            width: 48px;
-            height: 48px;
-            margin-bottom: 12px;
-            opacity: 0.5;
-        }
-
-        .empty-state p {
-            font-size: 0.9rem;
-        }
-
-        /* Left Column */
-        .left-col {
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            min-width: 0;
-            overflow: hidden;
-        }
-
-        /* Right Column */
-        .right-col {
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            min-width: 0;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .team-bar {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .team-bar-left {
-                flex-direction: column;
-            }
-
-            .fetch-btn {
-                justify-content: center;
-            }
-
-            .stats-row {
-                grid-template-columns: 1fr;
-            }
-
-            .result-outcome {
-                font-size: 2rem;
-            }
-
-            .header {
-                padding: 16px;
-            }
-
-            .container {
-                padding: 16px;
-            }
-        }
-
-        /* Insights Section */
-        .card-body {
-            padding: 0;
-        }
-
-        .insight-rule {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 12px 16px;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border);
-        }
-
-        .insight-rule.positive {
-            border-color: rgba(62, 207, 106, 0.2);
-        }
-
-        .insight-rule.negative {
-            border-color: rgba(239, 68, 68, 0.2);
-        }
-
-        .insight-symbol {
-            font-size: 1.1rem;
-            flex-shrink: 0;
-            line-height: 1.4;
-        }
-
-        .insight-text {
-            font-size: 0.85rem;
-            color: var(--text);
-            line-height: 1.5;
-        }
-
-        .insight-meta {
-            display: flex;
-            gap: 6px;
-            margin-top: 6px;
-            flex-wrap: wrap;
-        }
-
-        .insight-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: var(--text-muted);
-        }
-
-        .insight-badge.home {
-            color: var(--blue);
-            background: var(--blue-dim);
-            border-color: rgba(59, 130, 246, 0.3);
-        }
-
-        .insight-badge.away {
-            color: #f59e0b;
-            background: rgba(245, 158, 11, 0.15);
-            border-color: rgba(245, 158, 11, 0.3);
-        }
-
-        .insight-badge.strong {
-            color: var(--green);
-            background: var(--green-dim);
-            border-color: rgba(62, 207, 106, 0.3);
-        }
-
-        .text-xs { font-size: 0.75rem; }
-        .font-normal { font-weight: 400; }
-        .ml-2 { margin-left: 8px; }
-        .text-gray-500 { color: var(--text-muted); }
-        .text-center { text-align: center; }
-        .py-4 { padding-top: 16px; padding-bottom: 16px; }
-        .space-y-2 > * + * { margin-top: 8px; }
+            --bg: #0a0a0f; --card: #111118; --card-hover: #16161d; --border: rgba(255,255,255,0.08);
+            --text: #f0f0f5; --text-muted: #888899; --text-dim: #555566;
+            --green: #3ecf6a; --green-dim: rgba(62,207,106,0.15); --red: #ef4444; --red-dim: rgba(239,68,68,0.15);
+            --blue: #3b82f6; --blue-dim: rgba(59,130,246,0.2); --amber: #f59e0b; --amber-dim: rgba(245,158,11,0.15);
+            --radius: 16px; --radius-sm: 10px;
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; }
+        .header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .logo { font-size: 1.3rem; font-weight: 800; } .logo span { color: var(--green); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+        .card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 24px; margin-bottom: 20px; }
+        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+        .card-title { font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .btn { padding: 8px 16px; background: var(--blue); color: white; border: none; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn:hover:not(:disabled) { transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-green { background: var(--green); }
+        .btn-red { background: var(--red); }
+        .btn-sm { padding: 5px 10px; font-size: 0.75rem; }
+        .status-bar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; font-size: 0.85rem; color: var(--text-muted); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .status-dot.active { background: var(--green); }
+        .status-dot.loading { background: var(--amber); animation: pulse 1s infinite; }
+        .status-dot.error { background: var(--red); }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .spinner-wrap { display: none; justify-content: center; padding: 40px; }
+        .spinner-wrap.show { display: flex; }
+        .spinner { width: 28px; height: 28px; border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error-msg { display: none; padding: 12px 16px; background: var(--red-dim); border: 1px solid rgba(239,68,68,0.3); border-radius: var(--radius-sm); color: var(--red); font-size: 0.85rem; margin-bottom: 12px; }
+        .error-msg.show { display: block; }
+        .success-msg { display: none; padding: 12px 16px; background: var(--green-dim); border: 1px solid rgba(62,207,106,0.3); border-radius: var(--radius-sm); color: var(--green); font-size: 0.85rem; margin-bottom: 12px; }
+        .success-msg.show { display: block; }
+        .table-wrap { overflow-x: auto; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+        .table-wrap table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .table-wrap th { padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-muted); background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border); white-space: nowrap; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .table-wrap td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+        .table-wrap tr:last-child td { border-bottom: none; }
+        .table-wrap tr:hover td { background: rgba(255,255,255,0.02); }
+        .no-data { text-align: center; color: var(--text-muted); padding: 30px !important; }
+        /* Badges */
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; }
+        .badge.high { background: var(--green-dim); color: var(--green); }
+        .badge.medium { background: var(--amber-dim); color: var(--amber); }
+        .badge.bet { background: var(--green-dim); color: var(--green); }
+        .badge.pass { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+        .badge.inj { background: var(--red-dim); color: var(--red); }
+        .team-badge { font-weight: 700; }
+        .vs { color: var(--text-muted); margin: 0 6px; font-size: 0.8rem; }
+        /* Tabs */
+        .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+        .tab-btn { padding: 10px 20px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-muted); font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .tab-btn:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+        .tab-btn.active { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+        /* Power Rankings */
+        .pr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+        .pr-entry { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+        .pr-entry-header { display: flex; align-items: center; gap: 10px; }
+        .pr-rank { width: 28px; height: 28px; border-radius: 50%; background: var(--blue-dim); color: var(--blue); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem; flex-shrink: 0; }
+        .pr-team-name { font-weight: 600; font-size: 0.9rem; flex: 1; }
+        .pr-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .pr-input-group { display: flex; flex-direction: column; gap: 3px; }
+        .pr-input-group label { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+        .pr-input-group input { width: 100%; padding: 6px 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.85rem; font-weight: 600; }
+        .pr-input-group input:focus { outline: none; border-color: var(--green); }
+        /* Injuries */
+        .inj-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .inj-row:last-child { border-bottom: none; }
+        .inj-player { font-weight: 600; min-width: 120px; }
+        .inj-details { flex: 1; font-size: 0.85rem; color: var(--text-muted); }
+        .inj-status { font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+        .inj-status.out { background: var(--red-dim); color: var(--red); }
+        .inj-status.questionable { background: var(--amber-dim); color: var(--amber); }
+        .inj-status.probable { background: var(--blue-dim); color: var(--blue); }
+        .inj-row-main { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+        .inj-player { font-weight: 600; min-width: 80px; font-size: 0.8rem; }
+        .inj-details { flex: 1; }
+        .inj-name { font-weight: 600; margin-bottom: 2px; }
+        .inj-injury { font-size: 0.8rem; color: var(--text-muted); }
+        .inj-meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+        .inj-stats { font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; }
+        .inj-impact { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+        .inj-impact.high { background: var(--red-dim); color: var(--red); }
+        .inj-impact.medium { background: var(--amber-dim); color: var(--amber); }
+        .inj-impact.low { background: var(--blue-dim); color: var(--blue); }
+        .inj-impact.none { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+        .will-play-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; white-space: nowrap; }
+        .will-play-toggle label { color: var(--text-muted); cursor: pointer; }
+        .will-play-toggle input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--green); cursor: pointer; }
+        /* Backtest */
+        .backtest-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .backtest-stat { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; text-align: center; }
+        .backtest-stat .value { font-size: 1.8rem; font-weight: 800; color: var(--green); }
+        .backtest-stat .value.negative { color: var(--red); }
+        .backtest-stat .label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+        /* Forms */
+        .form-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 0.75rem; color: var(--text-muted); }
+        .form-group input, .form-group select { padding: 8px 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.85rem; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--green); }
+        /* Search */
+        .team-search { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+        .team-search select { padding: 8px 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.9rem; }
+        .prob-display { display: flex; flex-direction: column; gap: 2px; font-size: 0.8rem; }
+        .prob-row { display: flex; align-items: center; gap: 6px; }
+        .prob-bar { flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; max-width: 80px; }
+        .prob-fill { height: 100%; border-radius: 3px; }
+        .prob-fill.home { background: var(--green); }
+        .prob-fill.away { background: var(--red); }
+        .hidden { display: none !important; }
+        .section-divider { height: 1px; background: var(--border); margin: 20px 0; }
     </style>
 </head>
 <body>
     <header class="header">
-        <div class="header-content">
-            <div class="logo">🏀 <span>NBA</span> Win Predictor</div>
-            <div class="tagline">Advanced Statistical Prediction Model</div>
+        <div class="logo">🏀 NBA <span>Predictions</span></div>
+        <div style="display:flex;gap:8px">
+            <button class="btn" id="trainBtn">Train Model</button>
         </div>
     </header>
 
     <div class="container">
-        <!-- Team Selector Bar -->
-        <div class="team-bar">
-            <div class="team-bar-left">
-                <div class="team-badge" id="teamBadge">BOS</div>
-                <div class="team-select-wrap">
-                    <select id="teamSelect" class="team-select">
-                        <option value="ATL">Atlanta Hawks</option>
-                        <option value="BOS" selected>Boston Celtics</option>
-                        <option value="BKN">Brooklyn Nets</option>
-                        <option value="CHA">Charlotte Hornets</option>
-                        <option value="CHI">Chicago Bulls</option>
-                        <option value="CLE">Cleveland Cavaliers</option>
-                        <option value="DAL">Dallas Mavericks</option>
-                        <option value="DEN">Denver Nuggets</option>
-                        <option value="DET">Detroit Pistons</option>
-                        <option value="GSW">Golden State Warriors</option>
-                        <option value="HOU">Houston Rockets</option>
-                        <option value="IND">Indiana Pacers</option>
-                        <option value="LAC">Los Angeles Clippers</option>
-                        <option value="LAL">Los Angeles Lakers</option>
-                        <option value="MEM">Memphis Grizzlies</option>
-                        <option value="MIA">Miami Heat</option>
-                        <option value="MIL">Milwaukee Bucks</option>
-                        <option value="MIN">Minnesota Timberwolves</option>
-                        <option value="NOP">New Orleans Pelicans</option>
-                        <option value="NYK">New York Knicks</option>
-                        <option value="OKC">Oklahoma City Thunder</option>
-                        <option value="ORL">Orlando Magic</option>
-                        <option value="PHI">Philadelphia 76ers</option>
-                        <option value="PHO">Phoenix Suns</option>
-                        <option value="POR">Portland Trail Blazers</option>
-                        <option value="SAC">Sacramento Kings</option>
-                        <option value="SAS">San Antonio Spurs</option>
-                        <option value="TOR">Toronto Raptors</option>
-                        <option value="UTA">Utah Jazz</option>
-                        <option value="WAS">Washington Wizards</option>
-                    </select>
+        <div class="status-bar" id="statusBar">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Loading...</span>
+        </div>
+        <div class="error-msg" id="errorMsg"></div>
+        <div class="success-msg" id="successMsg"></div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="predictions">Tonight's Games</button>
+            <button class="tab-btn" data-tab="power-rankings">Power Rankings</button>
+            <button class="tab-btn" data-tab="injuries">Injuries</button>
+            <button class="tab-btn" data-tab="backtest">Backtest</button>
+        </div>
+
+        <!-- PREDICTIONS TAB -->
+        <div id="predictionsTab">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                        <span id="predictionsTitle">Tonight's Games</span>
+                    </div>
+                    <button class="btn" id="refreshPredBtn">Refresh</button>
                 </div>
-            </div>
-            <div class="season-select">
-                <span>Season:</span>
-                <input type="number" id="startYear" class="season-input" value="2017" min="2010" max="2030">
-                <span>to</span>
-                <input type="number" id="endYear" class="season-input" value="2026" min="2010" max="2030">
-            </div>
-            <button id="fetchBtn" class="fetch-btn">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                </svg>
-                Fetch Games
-            </button>
-            <button id="trainBtn" class="fetch-btn" style="background: linear-gradient(135deg, #16a34a, #15803d);">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-                </svg>
-                Train Model
-            </button>
-            <div id="fetchStatus" class="fetch-status hidden">
-                <span class="status-dot" id="statusDot"></span>
-                <span id="statusText"></span>
-            </div>
-            <div id="trainStatus" class="fetch-status hidden">
-                <span class="status-dot training" id="trainDot"></span>
-                <span id="trainText"></span>
+                <div class="spinner-wrap" id="predSpinner"><div class="spinner"></div></div>
+                <div class="table-wrap" id="predTableWrap" style="display:none;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th><th>Matchup</th><th>Win Probability</th><th>Moneyline</th>
+                                <th>Spread</th><th>Spread Rec</th><th>Conf</th>
+                            </tr>
+                        </thead>
+                        <tbody id="predBody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <div class="main-grid">
-            <!-- Left Column: Prediction + Stats -->
-            <div class="left-col">
-                <!-- Stats Summary Card -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                            </svg>
-                            Model Accuracy
-                        </div>
-                        <span class="live-badge">
-                            <span class="live-dot"></span>
-                            Live
-                        </span>
+        <!-- POWER RANKINGS TAB -->
+        <div id="powerRankingsTab" class="hidden">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
+                        Power Rankings — <span id="prSeasonLabel">2025-26</span>
                     </div>
-                    <div class="stats-row">
-                        <div class="stat-card">
-                            <div class="stat-value" id="overallAcc">--</div>
-                            <div class="stat-label">Overall</div>
-                            <div class="stat-count" id="overallCount">0 games</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="homeAcc">--</div>
-                            <div class="stat-label">Home</div>
-                            <div class="stat-count" id="homeCount">0 games</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="awayAcc">--</div>
-                            <div class="stat-label">Away</div>
-                            <div class="stat-count" id="awayCount">0 games</div>
-                        </div>
-                    </div>
-                    <div class="spinner-wrap" id="statsSpinner">
-                        <div class="spinner"></div>
-                    </div>
-                    <div class="error-msg" id="statsError"></div>
-                </div>
-
-                <!-- Prediction Panel Card -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"/>
-                                <path d="M12 6v6l4 2"/>
-                            </svg>
-                            Make Prediction
-                        </div>
-                    </div>
-                    <div class="prediction-panel">
-                        <div class="location-toggle">
-                            <button class="location-btn active" data-location="home">🏠 Home</button>
-                            <button class="location-btn" data-location="away">✈️ Away</button>
-                        </div>
-
-                        <div class="input-grid">
-                            <div class="input-group">
-                                <label class="input-label">Pace</label>
-                                <input type="number" id="pace" class="input-field" step="0.1" placeholder="96.5">
-                            </div>
-                            <div class="input-group">
-                                <label class="input-label">FTr</label>
-                                <input type="number" id="ftr" class="input-field" step="0.001" placeholder="0.253">
-                            </div>
-                            <div class="input-group">
-                                <label class="input-label">eFG%</label>
-                                <input type="number" id="efg_pct" class="input-field" step="0.001" placeholder="0.540">
-                            </div>
-                            <div class="input-group">
-                                <label class="input-label">TOV%</label>
-                                <input type="number" id="tov_pct" class="input-field" step="0.001" placeholder="0.140">
-                            </div>
-                            <div class="input-group">
-                                <label class="input-label">ORB%</label>
-                                <input type="number" id="orb_pct" class="input-field" step="0.001" placeholder="0.230">
-                            </div>
-                        </div>
-
-                        <div class="spinner-wrap" id="predSpinner">
-                            <div class="spinner"></div>
-                        </div>
-
-                        <div class="error-msg" id="predError"></div>
-
-                        <div class="result-display" id="resultDisplay">
-                            <div class="result-label">Prediction</div>
-                            <div class="result-outcome" id="resultOutcome">WIN</div>
-                            <div class="result-team" id="resultTeam">Boston Celtics</div>
-                            <div class="prob-section">
-                                <div class="prob-row">
-                                    <span class="prob-label">Win</span>
-                                    <div class="prob-bar">
-                                        <div class="prob-fill win" id="winBar" style="width: 0%">0%</div>
-                                    </div>
-                                </div>
-                                <div class="prob-row">
-                                    <span class="prob-label">Loss</span>
-                                    <div class="prob-bar">
-                                        <div class="prob-fill loss" id="lossBar" style="width: 0%">0%</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    <div style="display:flex;gap:8px">
+                        <input type="number" id="prSeasonInput" value="2026" min="2017" max="2030" style="padding:6px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text);width:80px;font-size:0.85rem">
+                        <button class="btn" id="loadPrBtn">Load</button>
+                        <button class="btn btn-green" id="savePrBtn">Save Rankings</button>
                     </div>
                 </div>
+                <div class="spinner-wrap" id="prSpinner"><div class="spinner"></div></div>
+                <div id="prGrid" class="pr-grid"></div>
             </div>
 
-            <!-- Right Column: Games Table -->
-            <div class="right-col">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                                <line x1="16" y1="2" x2="16" y2="6"/>
-                                <line x1="8" y1="2" x2="8" y2="6"/>
-                                <line x1="3" y1="10" x2="21" y2="10"/>
-                            </svg>
-                            Recent Games
-                        </div>
+            <div class="card" style="margin-top:16px">
+                <div class="card-header">
+                    <div class="card-title">H2H History</div>
+                </div>
+                <div class="team-search">
+                    <select id="h2hTeam1"><option value="">Team</option></select>
+                    <span style="color:var(--text-muted)">vs</span>
+                    <select id="h2hTeam2"><option value="">Opponent</option></select>
+                    <button class="btn btn-sm" id="loadH2HBtn">Load H2H</button>
+                </div>
+                <div id="h2hResults"></div>
+            </div>
+        </div>
+
+        <!-- INJURIES TAB -->
+        <div id="injuriesTab" class="hidden">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                        Injury Reports
                     </div>
+                    <div style="display:flex;gap:8px">
+                        <select id="injuryTeamFilter" style="padding:6px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.85rem">
+                            <option value="">All Teams</option>
+                        </select>
+                        <button class="btn" id="loadInjuriesBtn">Refresh</button>
+                        <button class="btn" id="addInjuryBtn" style="background:var(--green)">+ Add Injury</button>
+                    </div>
+                </div>
+                <div class="spinner-wrap" id="injSpinner"><div class="spinner"></div></div>
+                <div id="injuriesList"></div>
+            </div>
+
+            <!-- Add Injury Form -->
+            <div class="card" style="margin-top:16px;display:none" id="addInjuryForm">
+                <div class="card-header"><div class="card-title">Add Injury</div></div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Team</label>
+                        <select id="injFormTeam"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Player</label>
+                        <input type="text" id="injFormPlayer" placeholder="Player name">
+                    </div>
+                    <div class="form-group">
+                        <label>Injury</label>
+                        <input type="text" id="injFormInjury" placeholder="e.g. Ankle">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="injFormStatus">
+                            <option value="questionable">Questionable</option>
+                            <option value="probable">Probable</option>
+                            <option value="doubtful">Doubtful</option>
+                            <option value="out">Out</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Date Reported</label>
+                        <input type="date" id="injFormDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Season Year</label>
+                        <input type="number" id="injFormSeason" value="2026" min="2017" max="2030">
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:8px">
+                    <button class="btn btn-green" id="submitInjuryBtn">Save Injury</button>
+                    <button class="btn" id="cancelInjuryBtn">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- BACKTEST TAB -->
+        <div id="backtestTab" class="hidden">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg>
+                        Backtest Results
+                    </div>
+                    <button class="btn" id="runBacktestBtn">Run Backtest</button>
+                </div>
+                <div class="spinner-wrap" id="backtestSpinner"><div class="spinner"></div></div>
+                <div id="backtestSummary" class="backtest-summary" style="display:none"></div>
+                <div id="backtestDetails" style="display:none">
                     <div class="table-wrap">
-                        <table class="games-table">
+                        <table>
                             <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Opp</th>
-                                    <th>Loc</th>
-                                    <th>Pace</th>
-                                    <th>FTr</th>
-                                    <th>eFG%</th>
-                                    <th>TOV%</th>
-                                    <th>ORB%</th>
-                                    <th>Pred</th>
-                                    <th>Actual</th>
-                                    <th>Conf</th>
-                                    <th>✓</th>
-                                </tr>
+                                <tr><th>Date</th><th>Matchup</th><th>Bet</th><th>Prob</th><th>Result</th></tr>
                             </thead>
-                            <tbody id="gamesBody">
-                                <tr><td colspan="12" class="no-data">Loading games...</td></tr>
-                            </tbody>
+                            <tbody id="backtestBody"></tbody>
                         </table>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Insights Section -->
-        <div class="card" id="insightsCard">
-            <div class="card-header">
-                <div class="card-title">
-                    <span class="card-icon">💡</span>
-                    Model Insights
-                    <span id="insightsTeam" class="text-xs font-normal ml-2 text-gray-500"></span>
-                </div>
-            </div>
-            <div class="card-body">
-                <div id="insightsLoading" class="text-center py-4 text-gray-500">
-                    <span id="insightsEmpty">Train a model to see insights</span>
-                </div>
-                <div id="insightsList" class="space-y-2" style="display:none;"></div>
-            </div>
-        </div>
     </div>
 
     <script>
-        // State
-        let selectedLocation = 'home';
-        let selectedTeam = 'BOS';
-        let debounceTimer = null;
+    const TEAM_NAMES = {
+        "ATL":"Atlanta Hawks","BOS":"Boston Celtics","BKN":"Brooklyn Nets","CHA":"Charlotte Hornets",
+        "CHI":"Chicago Bulls","CLE":"Cleveland Cavaliers","DAL":"Dallas Mavericks","DEN":"Denver Nuggets",
+        "DET":"Detroit Pistons","GSW":"Golden State Warriors","HOU":"Houston Rockets","IND":"Indiana Pacers",
+        "LAC":"Los Angeles Clippers","LAL":"Los Angeles Lakers","MEM":"Memphis Grizzlies","MIA":"Miami Heat",
+        "MIL":"Milwaukee Bucks","MIN":"Minnesota Timberwolves","NOP":"New Orleans Pelicans","NYK":"New York Knicks",
+        "OKC":"Oklahoma City Thunder","ORL":"Orlando Magic","PHI":"Philadelphia 76ers","PHO":"Phoenix Suns",
+        "POR":"Portland Trail Blazers","SAC":"Sacramento Kings","SAS":"San Antonio Spurs","TOR":"Toronto Raptors",
+        "UTA":"Utah Jazz","WAS":"Washington Wizards"
+    };
+    const TEAM_CODES = Object.keys(TEAM_NAMES);
 
-        // Team codes to abbreviations for badge
-        const teamCodes = {
-            "ATL": "ATL", "BOS": "BOS", "BKN": "BKN", "CHA": "CHA", "CHI": "CHI",
-            "CLE": "CLE", "DAL": "DAL", "DEN": "DEN", "DET": "DET", "GSW": "GSW",
-            "HOU": "HOU", "IND": "IND", "LAC": "LAC", "LAL": "LAL", "MEM": "MEM",
-            "MIA": "MIA", "MIL": "MIL", "MIN": "MIN", "NOP": "NOP", "NYK": "NYK",
-            "OKC": "OKC", "ORL": "ORL", "PHI": "PHI", "PHO": "PHO", "POR": "POR",
-            "SAC": "SAC", "SAS": "SAS", "TOR": "TOR", "UTA": "UTA", "WAS": "WAS"
-        };
+    function setStatus(text, state='') {
+        document.getElementById('statusDot').className = 'status-dot ' + state;
+        document.getElementById('statusText').textContent = text;
+    }
+    function showError(msg) { const e=document.getElementById('errorMsg'); e.textContent=msg; e.classList.add('show'); setTimeout(()=>e.classList.remove('show'),5000); }
+    function showSuccess(msg) { const e=document.getElementById('successMsg'); e.textContent=msg; e.classList.add('show'); setTimeout(()=>e.classList.remove('show'),3000); }
+    function esc(t){ const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
 
-        // Team names
-        const teamNames = {
-            "ATL": "Atlanta Hawks", "BOS": "Boston Celtics", "BKN": "Brooklyn Nets",
-            "CHA": "Charlotte Hornets", "CHI": "Chicago Bulls", "CLE": "Cleveland Cavaliers",
-            "DAL": "Dallas Mavericks", "DEN": "Denver Nuggets", "DET": "Detroit Pistons",
-            "GSW": "Golden State Warriors", "HOU": "Houston Rockets", "IND": "Indiana Pacers",
-            "LAC": "Los Angeles Clippers", "LAL": "Los Angeles Lakers", "MEM": "Memphis Grizzlies",
-            "MIA": "Miami Heat", "MIL": "Milwaukee Bucks", "MIN": "Minnesota Timberwolves",
-            "NOP": "New Orleans Pelicans", "NYK": "New York Knicks", "OKC": "Oklahoma City Thunder",
-            "ORL": "Orlando Magic", "PHI": "Philadelphia 76ers", "PHO": "Phoenix Suns",
-            "POR": "Portland Trail Blazers", "SAC": "Sacramento Kings", "SAS": "San Antonio Spurs",
-            "TOR": "Toronto Raptors", "UTA": "Utah Jazz", "WAS": "Washington Wizards"
-        };
+    // ---- Tab Switching ----
+    document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click',e=>{
+        document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        const tab=e.currentTarget.dataset.tab;
+        document.querySelectorAll('[id$="Tab"]').forEach(t=>t.classList.add('hidden'));
+        document.getElementById(tab+'Tab').classList.remove('hidden');
+        if(tab==='predictions') loadPredictions();
+        if(tab==='power-rankings') loadPowerRankings();
+        if(tab==='injuries') loadInjuries();
+        if(tab==='backtest') loadBacktest();
+    }));
 
-        // Team selector
-        document.getElementById('teamSelect').addEventListener('change', (e) => {
-            selectedTeam = e.target.value;
-            document.getElementById('teamBadge').textContent = selectedTeam;
-            loadGameStats(selectedTeam);
-        });
+    // ---- Predictions ----
+    async function loadPredictions() {
+        const sp=document.getElementById('predSpinner'), tw=document.getElementById('predTableWrap');
+        sp.classList.add('show'); tw.style.display='none';
+        setStatus('Loading predictions...','loading');
+        try {
+            const resp=await fetch('/predictions');
+            if(!resp.ok) throw new Error((await resp.json()).detail);
+            const data=await resp.json();
+            renderPredictions(data.predictions||[]);
+            setStatus(`Loaded ${data.count} game${data.count!==1?'s':''}`,'active');
+        } catch(e) { showError(e.message); setStatus(e.message,'error'); }
+        finally { sp.classList.remove('show'); }
+    }
+    function renderPredictions(preds) {
+        const tbody=document.getElementById('predBody');
+        const today=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+        document.getElementById('predictionsTitle').textContent="Tonight's Games — "+today;
+        if(!preds.length){ tbody.innerHTML='<tr><td colspan="7" class="no-data">No games found</td></tr>'; document.getElementById('predTableWrap').style.display='block'; return; }
+        tbody.innerHTML=preds.map(p=>{
+            if(p.status==='completed') return `<tr><td>${esc(p.game_time||'--')}</td><td><span class="team-badge">${esc(p.home_team)}</span><span class="vs">vs</span><span class="team-badge">${esc(p.away_team)}</span></td><td colspan="5" class="no-data" style="text-align:center">Final — ${p.home_score??'?'}-${p.away_score??'?'}</td></tr>`;
+            const ml=p.moneyline, sp=p.spread||{};
+            const homeProb=Math.round((ml.home.win_probability||0)*100);
+            const awayProb=100-homeProb;
+            const homeMl=ml.home.recommendation.startsWith('BET')?`<span class="badge bet">${esc(ml.home.recommendation)}</span>`:`<span class="badge pass">PASS</span>`;
+            const awayMl=ml.away.recommendation.startsWith('BET')?`<span class="badge bet">${esc(ml.away.recommendation)}</span>`:`<span class="badge pass">PASS</span>`;
+            const spBadge=sp&&sp.recommendation?(sp.recommendation.startsWith('BET')?`<span class="badge bet">${esc(sp.recommendation)}</span>`:`<span class="badge pass">${sp.recommendation}</span>`):`<span class="badge pass">N/A</span>`;
+            const conf=sp&&sp.confidence?`<span class="badge ${sp.confidence}">${sp.confidence}</span>`:'--';
+            return `<tr>
+                <td>${esc(p.game_time||'--')}</td>
+                <td><span class="team-badge">${esc(p.home_team)}</span><span class="vs">vs</span><span class="team-badge">${esc(p.away_team)}</span></td>
+                <td><div class="prob-display"><div class="prob-row"><span style="color:var(--green);width:32px">${homeProb}%</span><span style="color:var(--text-dim)">${esc(p.home_team)}</span></div><div class="prob-row"><span style="color:var(--red);width:32px">${awayProb}%</span><span style="color:var(--text-dim)">${esc(p.away_team)}</span></div></div></td>
+                <td><div style="display:flex;flex-direction:column;gap:2px">${homeMl}${awayMl}</div></td>
+                <td style="font-variant-numeric:tabular-nums">${sp&&sp.predicted_spread!=null?(sp.predicted_spread>0?'+':'')+sp.predicted_spread:'--'}</td>
+                <td>${spBadge}</td>
+                <td>${conf}</td>
+            </tr>`;
+        }).join('');
+        document.getElementById('predTableWrap').style.display='block';
+    }
+    document.getElementById('refreshPredBtn').addEventListener('click',loadPredictions);
+    window.addEventListener('load',loadPredictions);
 
-        // Location selector
-        document.querySelectorAll('.location-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.location-btn').forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
-                selectedLocation = e.target.dataset.location;
-                triggerPrediction();
-            });
-        });
+    // ---- Power Rankings ----
+    let currentPrEntries = TEAM_CODES.map(code=>({team:code,rank:15,power_rating:0,net_rtg:0,ortg_override:null,drtg_override:null,notes:""}));
 
-        // Fetch button
-        document.getElementById('fetchBtn').addEventListener('click', fetchTeamGames);
+    function renderPrGrid(entries) {
+        const grid=document.getElementById('prGrid');
+        const sorted=[...entries].sort((a,b)=>a.rank-b.rank);
+        grid.innerHTML=sorted.map(e=>`
+            <div class="pr-entry" data-team="${e.team}">
+                <div class="pr-entry-header">
+                    <div class="pr-rank">${e.rank}</div>
+                    <div class="pr-team-name">${e.team} ${TEAM_NAMES[e.team]?'('+TEAM_NAMES[e.team].split(' ').slice(-1)[0]+')':''}</div>
+                </div>
+                <div class="pr-inputs">
+                    <div class="pr-input-group"><label>Rating</label><input type="number" step="0.1" value="${e.power_rating}" data-field="power_rating" onchange="updatePrEntry('${e.team}',this.dataset.field,this.value)"></div>
+                    <div class="pr-input-group"><label>Net RTG</label><input type="number" step="0.1" value="${e.net_rtg}" data-field="net_rtg" onchange="updatePrEntry('${e.team}',this.dataset.field,parseFloat(this.value)||0)"></div>
+                </div>
+            </div>`).join('');
+    }
 
-        // Form inputs for live prediction
-        ['pace', 'ftr', 'efg_pct', 'tov_pct', 'orb_pct'].forEach(id => {
-            document.getElementById(id).addEventListener('input', triggerPrediction);
-        });
+    window.updatePrEntry = function(team,field,value) {
+        const e=currentPrEntries.find(x=>x.team===team);
+        if(e) e[field]=value;
+    };
 
-        // Load on start
-        window.addEventListener('load', () => loadGameStats("BOS"));
-
-        async function loadGameStats(teamCode = "BOS") {
-            const spinner = document.getElementById('statsSpinner');
-            const error = document.getElementById('statsError');
-            spinner.classList.add('show');
-            error.classList.remove('show');
-
-            // Remove stale team-warn banner
-            const staleWarn = document.querySelector('.team-warn');
-            if (staleWarn) staleWarn.remove();
-
-            try {
-                const resp = await fetch(`/game-stats?team_code=${teamCode}`);
-                if (!resp.ok) {
-                    if (resp.status === 404) {
-                        setStatsEmpty();
-                        const tb = document.getElementById('gamesBody');
-                        if (tb) tb.innerHTML = `<tr><td colspan="12" class="no-data">No model trained for ${teamCode}. Train with: python train_models.py --team ${teamCode}</td></tr>`;
-                        return;
-                    }
-                    throw new Error('Failed to load');
-                }
-
-                const data = await resp.json();
-
-                // Show amber warning if using fallback (no team-specific model)
-                if (data.used_fallback) {
-                    let warnEl = document.querySelector('.team-warn');
-                    if (!warnEl) {
-                        warnEl = document.createElement('div');
-                        warnEl.className = 'team-warn';
-                        warnEl.style.cssText = 'margin:8px 0 0;font-size:0.75rem;padding:6px 10px;background:rgba(245,158,11,0.1);border:1px solid #f59e0b;border-radius:6px;color:#f59e0b';
-                        const statsCard = document.querySelector('.stats-row')?.parentElement;
-                        if (statsCard) statsCard.appendChild(warnEl);
-                    }
-                    warnEl.textContent = `⚠ No model trained for ${teamCode} — showing ${data.team_code} data`;
-                }
-
-                document.getElementById('overallAcc').textContent = data.total_games > 0 ? data.overall_accuracy.toFixed(1) + '%' : '--';
-                document.getElementById('overallCount').textContent = data.total_games + ' games';
-                document.getElementById('homeAcc').textContent = data.home_games_count > 0 ? data.home_accuracy.toFixed(1) + '%' : '--';
-                document.getElementById('homeCount').textContent = data.home_games_count + ' home';
-                document.getElementById('awayAcc').textContent = data.away_games_count > 0 ? data.away_accuracy.toFixed(1) + '%' : '--';
-                document.getElementById('awayCount').textContent = data.away_games_count + ' away';
-
-                updateGamesTable(data.recent_games || []);
-            } catch (err) {
-                console.error(err);
-                setStatsEmpty();
-                error.textContent = 'Failed to load statistics';
-                error.classList.add('show');
-            } finally {
-                spinner.classList.remove('show');
+    async function loadPowerRankings() {
+        const season=parseInt(document.getElementById('prSeasonInput').value)||2026;
+        document.getElementById('prSeasonLabel').textContent=`${season-1}-${String(season).slice(-2)}`;
+        const sp=document.getElementById('prSpinner');
+        sp.classList.add('show');
+        // Show default grid immediately so something is visible
+        renderPrGrid(currentPrEntries);
+        try {
+            const resp=await fetch(`/api/power-rankings/${season}`);
+            const data=await resp.json();
+            const entries=data.entries||[];
+            if(entries.length>0) {
+                currentPrEntries=entries.map(e=>({team:e.team,rank:e.rank||15,power_rating:e.power_rating||0,net_rtg:e.net_rtg||0,ortg_override:e.ortg_override||null,drtg_override:e.drtg_override||null,notes:e.notes||""}));
+                renderPrGrid(currentPrEntries);
             }
-        }
+        } catch(e) { showError(e.message); }
+        finally { sp.classList.remove('show'); }
+    }
 
-        function setStatsEmpty() {
-            document.getElementById('overallAcc').textContent = '--';
-            document.getElementById('overallCount').textContent = '0 games';
-            document.getElementById('homeAcc').textContent = '--';
-            document.getElementById('homeCount').textContent = '0 home';
-            document.getElementById('awayAcc').textContent = '--';
-            document.getElementById('awayCount').textContent = '0 away';
-        }
+    document.getElementById('loadPrBtn').addEventListener('click',loadPowerRankings);
+    document.getElementById('savePrBtn').addEventListener('click',async()=>{
+        const season=parseInt(document.getElementById('prSeasonInput').value)||2026;
+        const entries=currentPrEntries.map(e=>({...e}));
+        try {
+            const resp=await fetch('/api/power-rankings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({season_year:season,entries})});
+            if(!resp.ok) throw new Error((await resp.json()).detail);
+            showSuccess('Power rankings saved!');
+        } catch(e) { showError(e.message); }
+    });
 
-        function updateGamesTable(games) {
-            const tbody = document.getElementById('gamesBody');
+    // ---- H2H ----
+    function populateTeamSelects() {
+        const opts='<option value="">Team</option>'+TEAM_CODES.map(c=>`<option value="${c}">${c} - ${TEAM_NAMES[c]}</option>`).join('');
+        document.getElementById('h2hTeam1').innerHTML=opts;
+        document.getElementById('h2hTeam2').innerHTML=opts;
+        document.getElementById('injuryTeamFilter').innerHTML='<option value="">All Teams</option>'+opts.replace('<option value="">Team</option>','');
+        document.getElementById('injFormTeam').innerHTML=opts.replace('<option value="">Team</option>','');
+    }
+    populateTeamSelects();
 
-            if (!games || games.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="12" class="no-data">No games found. Fetch data or train models.</td></tr>';
+    document.getElementById('loadH2HBtn').addEventListener('click',async()=>{
+        const t1=document.getElementById('h2hTeam1').value, t2=document.getElementById('h2hTeam2').value;
+        if(!t1||!t2) { showError('Select both teams'); return; }
+        try {
+            const resp=await fetch(`/api/h2h/${t1}/vs/${t2}`);
+            const data=await resp.json();
+            const results=document.getElementById('h2hResults');
+            if(!data.total_games) { results.innerHTML='<div class="no-data">No H2H games found</div>'; return; }
+            const allGames=[...(data.this_season||[]),...(data.last_season||[])];
+            results.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Location</th><th>Result</th><th>Score</th></tr></thead><tbody>${allGames.slice(0,20).map(g=>`<tr><td>${esc(g.date||'')}</td><td>${esc(g.location||'')}</td><td class="${g.result==='W'?'win':'loss'}">${esc(g.result||'')}</td><td>${esc(g.team_score??'?')}-${esc(g.opponent_score??'?')}</td></tr>`).join('')}</tbody></table></div>`;
+        } catch(e) { showError(e.message); }
+    });
+
+    // ---- Injuries ----
+    async function loadInjuries() {
+        const team=document.getElementById('injuryTeamFilter').value;
+        const sp=document.getElementById('injSpinner');
+        sp.classList.add('show');
+        try {
+            const url=team?`/api/injuries?team=${team}`:'/api/injuries';
+            const resp=await fetch(url);
+            const data=await resp.json();
+            const list=document.getElementById('injuriesList');
+            if(!data.injuries||!data.injuries.length) {
+                list.innerHTML='<div class="no-data">No injuries found. <button class="btn btn-green" onclick="fetchInjuries()" style="margin-top:12px">Fetch from ESPN</button></div>';
                 return;
             }
-
-            function esc(text) {
-                const d = document.createElement('div');
-                d.textContent = text;
-                return d.innerHTML;
-            }
-
-            function fmtDate(dateStr) {
-                if (!dateStr) return '--';
-                const d = new Date(dateStr + 'T00:00:00Z');
-                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit', timeZone: 'UTC' });
-            }
-
-            tbody.innerHTML = games.map(g => {
-                const loc = g.location === 'home' ? 'H' : 'A';
-                const pred = g.prediction ? 'W' : 'L';
-                const actual = g.actual ? 'W' : 'L';
-                const correct = g.correct;
-                const conf = Math.round((g.win_prob || 0.5) * 100);
-
-                return `<tr>
-                    <td class="num">${fmtDate(g.date)}</td>
-                    <td>${esc(g.opponent || '?')}</td>
-                    <td><span class="loc-badge">${loc}</span></td>
-                    <td class="num">${(g.pace || 0).toFixed(1)}</td>
-                    <td class="num">${(g.ftr || 0).toFixed(3)}</td>
-                    <td class="num">${(g.efg_pct || 0).toFixed(3)}</td>
-                    <td class="num">${(g.tov_pct || 0).toFixed(3)}</td>
-                    <td class="num">${(g.orb_pct || 0).toFixed(3)}</td>
-                    <td><span class="res-badge ${pred === 'W' ? 'win' : 'loss'}">${pred}</span></td>
-                    <td><span class="res-badge ${actual === 'W' ? 'win' : 'loss'}">${actual}</span></td>
-                    <td class="num">${conf}%</td>
-                    <td class="${correct ? 'correct-badge' : 'incorrect-badge'}">${correct ? '✓' : '✗'}</td>
-                </tr>`;
-            }).join('');
-        }
-
-        function triggerPrediction() {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(makePrediction, 300);
-        }
-
-        async function makePrediction() {
-            const spinner = document.getElementById('predSpinner');
-            const error = document.getElementById('predError');
-            const result = document.getElementById('resultDisplay');
-
-            const formData = {
-                team_code: selectedTeam,
-                location: selectedLocation,
-                pace: parseFloat(document.getElementById('pace').value),
-                ftr: parseFloat(document.getElementById('ftr').value),
-                efg_pct: parseFloat(document.getElementById('efg_pct').value),
-                tov_pct: parseFloat(document.getElementById('tov_pct').value),
-                orb_pct: parseFloat(document.getElementById('orb_pct').value),
-            };
-
-            const hasAll = Object.values(formData).every(v => !isNaN(v) && v !== '');
-            if (!hasAll) {
-                result.classList.remove('show');
-                return;
-            }
-
-            error.classList.remove('show');
-            spinner.classList.add('show');
-
-            try {
-                const resp = await fetch('/predict', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData)
-                });
-
-                if (!resp.ok) {
-                    const err = await resp.json();
-                    throw new Error(err.detail || 'Prediction failed');
-                }
-
-                const data = await resp.json();
-                displayResult(data);
-            } catch (err) {
-                error.textContent = err.message;
-                error.classList.add('show');
-                result.classList.remove('show');
-            } finally {
-                spinner.classList.remove('show');
-            }
-        }
-
-        function displayResult(data) {
-            const result = document.getElementById('resultDisplay');
-            const outcome = document.getElementById('resultOutcome');
-            const team = document.getElementById('resultTeam');
-            const winBar = document.getElementById('winBar');
-            const lossBar = document.getElementById('lossBar');
-
-            const winPct = Math.round(data.win_probability * 100);
-            const lossPct = Math.round(data.loss_probability * 100);
-
-            const teamName = teamNames[data.team_code] || data.team_code;
-
-            outcome.textContent = data.win_prediction ? 'WIN' : 'LOSS';
-            outcome.className = 'result-outcome ' + (data.win_prediction ? 'win' : 'loss');
-            team.textContent = teamName + ' (' + (selectedLocation === 'home' ? 'Home' : 'Away') + ')';
-
-            winBar.style.width = winPct + '%';
-            winBar.textContent = winPct + '%';
-            lossBar.style.width = lossPct + '%';
-            lossBar.textContent = lossPct + '%';
-
-            result.classList.add('show');
-        }
-
-        async function fetchTeamGames() {
-            const fetchBtn = document.getElementById('fetchBtn');
-            const status = document.getElementById('fetchStatus');
-            const statusDot = document.getElementById('statusDot');
-            const statusText = document.getElementById('statusText');
-            const error = document.getElementById('predError');
-
-            error.classList.remove('show');
-            status.classList.remove('hidden');
-            statusDot.classList.add('loading');
-            statusDot.classList.remove('active');
-            statusText.textContent = 'Fetching games...';
-            fetchBtn.disabled = true;
-
-            try {
-                const resp = await fetch(`/teams/${selectedTeam}/fetch`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        start_year: parseInt(document.getElementById('startYear').value),
-                        end_year: parseInt(document.getElementById('endYear').value),
-                        force_refresh: false
-                    })
-                });
-
-                if (!resp.ok) {
-                    const err = await resp.json();
-                    throw new Error(err.detail || 'Fetch failed');
-                }
-
-                const data = await resp.json();
-                statusText.textContent = `✓ Fetched ${data.total_games_fetched} games (${data.seasons.length} seasons)`;
-                statusDot.classList.remove('loading');
-                statusDot.classList.add('active');
-                loadGameStats(selectedTeam);
-
-            } catch (err) {
-                statusText.textContent = '✗ ' + err.message;
-                statusDot.classList.remove('loading');
-                statusDot.classList.add('active');
-                error.textContent = 'Fetch failed: ' + err.message;
-                error.classList.add('show');
-            } finally {
-                fetchBtn.disabled = false;
-            }
-        }
-
-        async function trainModel() {
-            const trainBtn = document.getElementById('trainBtn');
-            const trainDot = document.getElementById('trainDot');
-            const trainText = document.getElementById('trainText');
-            const trainStatus = document.getElementById('trainStatus');
-
-            trainBtn.disabled = true;
-            trainStatus.classList.remove('hidden');
-            trainDot.classList.remove('active');
-            trainDot.classList.add('training');
-            trainText.textContent = `Training ${selectedTeam} model…`;
-
-            try {
-                const resp = await fetch('/api/train', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ team_code: selectedTeam }),
-                });
-
-                const data = await resp.json();
-
-                if (!resp.ok) {
-                    throw new Error(data.detail || 'Training failed');
-                }
-
-                trainDot.classList.remove('training');
-                trainDot.classList.add('active');
-                const acc = typeof data.training_accuracy === 'number' ? data.training_accuracy.toFixed(1) + '%' : '--';
-                const testAcc = typeof data.test_accuracy === 'number' ? data.test_accuracy.toFixed(1) + '%' : '--';
-                trainText.textContent = `✓ ${selectedTeam} trained! ${data.total_games} games | Train: ${acc} | Test: ${testAcc}`;
-
-                // Store and render insights
-                window._teamInsights = window._teamInsights || {};
-                window._teamInsights[selectedTeam] = data.insights || [];
-                renderInsights(selectedTeam);
-
-                // Refresh game stats for this team
-                loadGameStats(selectedTeam);
-
-            } catch (err) {
-                trainDot.classList.remove('training');
-                trainDot.classList.add('active');
-                trainText.textContent = '✗ ' + err.message;
-            } finally {
-                trainBtn.disabled = false;
-            }
-        }
-
-        function renderInsights(team) {
-            const insights = (window._teamInsights || {})[team] || [];
-            const listEl = document.getElementById('insightsList');
-            const emptyEl = document.getElementById('insightsEmpty');
-            const teamEl = document.getElementById('insightsTeam');
-
-            if (!listEl) return;
-            teamEl.textContent = team ? `(${team})` : '';
-
-            if (insights.length === 0) {
-                listEl.style.display = 'none';
-                if (emptyEl) emptyEl.textContent = 'Train a model to see insights';
-                return;
-            }
-
-            // Separate baseline from rules
-            const rules = insights.filter(i => i.type === 'rule');
-            const baselines = insights.filter(i => i.type === 'baseline');
-
-            let html = '';
-
-            // Hide the loading indicator now that we have insights
-            const loadingEl = document.getElementById('insightsLoading');
-            if (loadingEl) loadingEl.style.display = 'none';
-
-            if (baselines.length > 0) {
-                baselines.forEach(b => {
-                    html += `<div class="insight-rule" style="border-color:rgba(59,130,246,0.2)">
-                        <span class="insight-symbol">📊</span>
-                        <div>
-                            <div class="insight-text">${b.description}</div>
+            list.innerHTML=data.injuries.map(i=>{
+                const impact=i.player_impact_score||0;
+                const impactClass=impact>=3?'high':impact>=1.5?'medium':impact>0?'low':'none';
+                const stats=i.player_pts?`${Number(i.player_pts).toFixed(1)}ppg / ${Number(i.player_min).toFixed(1)}min`:'No stats';
+                const willPlayChecked=(i.will_play!==0);
+                return `<div class="inj-row" style="flex-direction:column;gap:6px">
+                    <div class="inj-row-main">
+                        <div class="inj-player">${esc(i.team)}</div>
+                        <div class="inj-details">
+                            <div class="inj-name">${esc(i.player_name||'?')} <span class="inj-status ${esc(i.status||'questionable')}">${esc((i.status||'').toUpperCase())}</span></div>
+                            <div class="inj-injury">${esc(i.injury||'Unknown injury')}</div>
+                            <div class="inj-meta">
+                                <span class="inj-stats" title="Per-game stats">${stats}</span>
+                                ${impact>0?`<span class="inj-impact ${impactClass}" title="Impact if player misses game">-${impact.toFixed(1)} impact</span>`:''}
+                                <span class="will-play-toggle">
+                                    <input type="checkbox" id="wp-${i.id}" ${willPlayChecked?'checked':''} onchange="toggleWillPlay(${i.id},this.checked)">
+                                    <label for="wp-${i.id}">Will Play</label>
+                                </span>
+                            </div>
                         </div>
-                    </div>`;
-                });
-            }
-
-            rules.forEach(insight => {
-                const isPositive = insight.direction === 'higher';
-                const symbol = isPositive ? '↑' : '↓';
-                const strengthColor = insight.strength === 'strong' ? 'strong' : '';
-                html += `<div class="insight-rule ${isPositive ? 'positive' : 'negative'}">
-                    <span class="insight-symbol">${symbol}</span>
-                    <div>
-                        <div class="insight-text">${insight.description}</div>
-                        <div class="insight-meta">
-                            <span class="insight-badge ${insight.location}">${insight.location}</span>
-                            <span class="insight-badge ${strengthColor}">${insight.strength}</span>
-                            <span class="insight-badge">±${insight.probChange}%</span>
-                        </div>
+                        <button class="btn btn-sm btn-red" onclick="deleteInjury(${i.id})" title="Delete">✕</button>
                     </div>
                 </div>`;
-            });
+            }).join('');
+        } catch(e) { showError(e.message); }
+        finally { sp.classList.remove('show'); }
+    }
 
-            listEl.innerHTML = html;
-            listEl.style.display = 'flex';
-            listEl.style.flexDirection = 'column';
-            listEl.style.gap = '8px';
-            if (emptyEl) emptyEl.textContent = '';
-        }
+    window.toggleWillPlay = async function(id, willPlay) {
+        try {
+            const resp = await fetch(`/api/injuries/${id}?will_play=${willPlay?1:0}`, {method: 'PATCH'});
+            if (!resp.ok) throw new Error('Failed to update');
+            showSuccess(willPlay ? 'Player marked as WILL PLAY — no impact penalty' : 'Player marked as WILL MISS — impact penalty applied');
+        } catch(e) { showError(e.message); }
+    };
 
-        document.getElementById('trainBtn').addEventListener('click', trainModel);
+    async function fetchInjuries() {
+        const sp=document.getElementById('injSpinner');
+        sp.classList.add('show');
+        try {
+            const resp = await fetch('/api/injuries/fetch', {method: 'POST'});
+            const data = await resp.json();
+            showSuccess(`Fetched ${data.fetched} injuries from ESPN`);
+            loadInjuries();
+        } catch(e) { showError(e.message); }
+        finally { sp.classList.remove('show'); }
+    }
+
+    window.deleteInjury = async function(id) {
+        try {
+            await fetch(`/api/injuries/${id}`,{method:'DELETE'});
+            showSuccess('Injury deleted');
+            loadInjuries();
+        } catch(e) { showError(e.message); }
+    };
+
+    document.getElementById('loadInjuriesBtn').addEventListener('click',fetchInjuries);
+    document.getElementById('addInjuryBtn').addEventListener('click',()=>document.getElementById('addInjuryForm').style.display='block');
+    document.getElementById('cancelInjuryBtn').addEventListener('click',()=>document.getElementById('addInjuryForm').style.display='none');
+    document.getElementById('submitInjuryBtn').addEventListener('click',async()=>{
+        const body={team:document.getElementById('injFormTeam').value,player_name:document.getElementById('injFormPlayer').value,injury:document.getElementById('injFormInjury').value,status:document.getElementById('injFormStatus').value,date_reported:document.getElementById('injFormDate').value,season_year:parseInt(document.getElementById('injFormSeason').value)};
+        if(!body.team||!body.player_name) { showError('Team and player are required'); return; }
+        try {
+            const resp=await fetch('/api/injuries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+            if(!resp.ok) throw new Error((await resp.json()).detail);
+            showSuccess('Injury saved');
+            document.getElementById('addInjuryForm').style.display='none';
+            loadInjuries();
+        } catch(e) { showError(e.message); }
+    });
+
+    // ---- Backtest ----
+    async function loadBacktest() {
+        // Just show empty state, user clicks Run
+        document.getElementById('backtestSummary').style.display='none';
+        document.getElementById('backtestDetails').style.display='none';
+    }
+
+    document.getElementById('runBacktestBtn').addEventListener('click',async()=>{
+        const sp=document.getElementById('backtestSpinner');
+        sp.classList.add('show');
+        try {
+            const resp=await fetch('/api/backtest');
+            if(!resp.ok) throw new Error((await resp.json()).detail);
+            const data=await resp.json();
+            const sum=document.getElementById('backtestSummary');
+            sum.style.display='grid';
+            sum.innerHTML=`
+                <div class="backtest-stat"><div class="value">${data.accuracy||0}%</div><div class="label">Accuracy (bets only)</div></div>
+                <div class="backtest-stat"><div class="value">${data.games_bet||0}</div><div class="label">Games Bet</div></div>
+                <div class="backtest-stat"><div class="value ${data.roi_units<0?'negative':''}">${data.roi_units>0?'+':''}${data.roi_units||0}</div><div class="label">ROI (units)</div></div>
+                <div class="backtest-stat"><div class="value ${data.roi_pct<0?'negative':''}">${data.roi_pct>0?'+':''}${data.roi_pct||0}%</div><div class="label">ROI %</div></div>
+                <div class="backtest-stat"><div class="value">${data.games_passed||0}</div><div class="label">Games Passed</div></div>
+                <div class="backtest-stat"><div class="value">${data.total_games||0}</div><div class="label">Total Test Games</div></div>`;
+            const det=document.getElementById('backtestDetails');
+            det.style.display='block';
+            const tbody=document.getElementById('backtestBody');
+            tbody.innerHTML=(data.details||[]).map(r=>`<tr>
+                <td>${esc(r.date||'')}</td><td>${esc(r.matchup||'')}</td><td>${esc(r.bet||'')}</td><td>${r.prob||'--'}</td>
+                <td style="color:${r.result==='WIN'?'var(--green)':r.result==='LOSS'?'var(--red)':'var(--text-muted)'}">${esc(r.result||'--')}</td>
+            </tr>`).join('');
+        } catch(e) { showError(e.message); }
+        finally { sp.classList.remove('show'); }
+    });
+
+    // ---- Train ----
+    document.getElementById('trainBtn').addEventListener('click',async()=>{
+        const btn=document.getElementById('trainBtn');
+        btn.disabled=true; setStatus('Training models...','loading');
+        try {
+            const resp=await fetch('/api/train',{method:'POST'});
+            const data=await resp.json();
+            if(!resp.ok) throw new Error(data.detail||'Training failed');
+            setStatus(`Trained! ML acc: ${data.results?.moneyline?.test_accuracy||'?'}%`,'active');
+            showSuccess('Models trained successfully');
+            loadPredictions();
+        } catch(e) { showError(e.message); setStatus('Training failed','error'); }
+        finally { btn.disabled=false; }
+    });
     </script>
 </body>
 </html>
