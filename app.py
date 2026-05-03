@@ -1,49 +1,39 @@
 """NBA Win Predictor - Display model data and performance results."""
-import pandas as pd
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import make_pipeline
-from flask import Flask, jsonify, request, render_template_string
-import kagglehub
+
 import os
+
+import joblib
+import pandas as pd
+from flask import Flask, jsonify, render_template_string
+
+REPO_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_DIR = os.path.join(REPO_DIR, "models")
 
 app = Flask(__name__)
 
-# Load data once at startup
-path = kagglehub.dataset_download("eoinamoore/historical-nba-data-and-player-box-scores")
-df = pd.read_csv(f"{path}/TeamStatistics.csv")
-featCols = ['teamId', 'home', 'assists', 'reboundsTotal', 'blocks', 'steals',
-            'turnovers', 'foulsPersonal', 'q1Points', 'q2Points',
-            'fieldGoalsAttempted', 'threePointersAttempted', 'freeThrowsAttempted']
-# Columns to display in table (excludes teamId and home, shown separately)
-displayCols = ['assists', 'reboundsTotal', 'blocks', 'steals', 'turnovers',
-               'foulsPersonal', 'q1Points', 'q2Points',
-               'fieldGoalsAttempted', 'threePointersAttempted', 'freeThrowsAttempted']
-# Display labels for table headers (matches displayCols order)
-displayLabels = ['A', 'R', 'B', 'S', 'TO', 'F', 'Q1', 'Q2', 'FGA', '3FA', 'FTA']
-# Preserve columns before dropna for display
-all_game_dates = df['gameDate'].astype(str)
-all_opponent_names = df['opponentTeamName']
-all_team_names = df['teamName']
-df = df.dropna(subset=featCols + ['win'])
-X = df[featCols]
-y = df['win']
+# ── Load saved model + metadata ────────────────────────────────────────────
+model_path = os.path.join(MODEL_DIR, "model.joblib")
+meta_path  = os.path.join(MODEL_DIR, "metadata.json")
+pred_path  = os.path.join(MODEL_DIR, "predictions.csv")   # was saved as .csv (no pyarrow)
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
+model   = joblib.load(model_path)
+meta    = pd.read_json(meta_path, orient="records").iloc[0].to_dict()
 
-model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=2000, random_state=0))
-model.fit(X_train, y_train)
-acc = model.score(X_test, y_test)
+feat_cols     = meta["feature_cols"]
+display_cols  = meta["display_cols"]
+display_labels= meta["display_labels"]
+test_acc      = meta["test_accuracy"]
+train_acc     = meta["train_accuracy"]
+total_games   = meta["total_games"]
+train_games   = meta["train_games"]
+test_games    = meta["test_games"]
 
-# Model results
-train_preds = model.predict(X_train)
-test_preds = model.predict(X_test)
-train_acc = accuracy_score(y_train, train_preds)
-test_acc = accuracy_score(y_test, test_preds)
+# Predictions (newest first)
+predictions_df = pd.read_csv(pred_path)
 
+PER_PAGE = 20
 
+# ── HTML template ─────────────────────────────────────────────────────────────
 HTML = '''
 <!DOCTYPE html>
 <html>
@@ -58,7 +48,9 @@ HTML = '''
         .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 4px; }
         h1 { font-size: 1.5rem; font-weight: 800; }
         h1 span { color: #3ecf6a; }
-        .tagline { color: #888899; font-size: 0.85rem; margin-bottom: 32px; }
+        .tagline { color: #888899; font-size: 0.85rem; margin-bottom: 8px; }
+        .trained-tag { color: #888899; font-size: 0.75rem; }
+        .trained-tag span { color: #aaa; }
         .dataset-btn { display: inline-block; padding: 8px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #888899; text-decoration: none; font-size: 0.8rem; transition: all 0.2s; }
         .dataset-btn:hover { background: rgba(255,255,255,0.1); color: #f0f0f5; }
         .card { background: #111118; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 24px; margin-bottom: 20px; overflow-x: auto; }
@@ -74,11 +66,8 @@ HTML = '''
         .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; }
         .badge.win { background: rgba(62,207,106,0.15); color: #3ecf6a; }
         .badge.loss { background: rgba(239,68,68,0.15); color: #ef4444; }
-        .correct { color: #3ecf6a; }
-        .incorrect { color: #ef4444; }
         .correct-row td { background: rgba(62,207,106,0.08); }
         .incorrect-row td { background: rgba(239,68,68,0.08); }
-        .section { margin-top: 24px; }
         .features { display: flex; flex-wrap: wrap; gap: 8px; }
         .feature-tag { padding: 4px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; font-size: 0.8rem; color: #888899; }
         .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 16px; }
@@ -98,6 +87,7 @@ HTML = '''
             <div>
                 <h1>🏀 NBA <span>Win Predictor</span></h1>
                 <p class="tagline">Logistic Regression on Team Statistics</p>
+                <p class="trained-tag">Trained <span>{{ trained_at }}</span> &nbsp;·&nbsp; {{ total_games|default(0)|int|commatize }} total games</p>
             </div>
             <a class="dataset-btn" href="https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores?select=TeamStatistics.csv" target="_blank">📂 View Dataset</a>
         </div>
@@ -106,19 +96,19 @@ HTML = '''
             <div class="section-title">📊 Model Performance</div>
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-value">{{ "%.1f"|format(test_acc * 100) }}%</div>
+                    <div class="stat-value">{{ "%.1f"|format((test_accuracy or 0) * 100) }}%</div>
                     <div class="stat-label">Test Accuracy</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">{{ train_games }}</div>
+                    <div class="stat-value">{{ (train_games or 0)|int|commatize }}</div>
                     <div class="stat-label">Training Games</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">{{ test_games }}</div>
+                    <div class="stat-value">{{ (test_games or 0)|int|commatize }}</div>
                     <div class="stat-label">Testing Games</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">{{ total_games }}</div>
+                    <div class="stat-value">{{ (total_games or 0)|int|commatize }}</div>
                     <div class="stat-label">Total Games</div>
                 </div>
             </div>
@@ -127,7 +117,7 @@ HTML = '''
         <div class="card">
             <div class="section-title">🔧 Feature Columns</div>
             <div class="features">
-                {% for f in featCols %}
+                {% for f in feat_cols %}
                 <span class="feature-tag">{{ f }}</span>
                 {% endfor %}
             </div>
@@ -157,7 +147,7 @@ HTML = '''
                         <th>Team</th>
                         <th>Opp</th>
                         <th>H/A</th>
-                        {% for f in displayLabels %}
+                        {% for f in display_labels %}
                         <th>{{ f }}</th>
                         {% endfor %}
                         <th>P</th>
@@ -166,12 +156,12 @@ HTML = '''
                 </thead>
                 <tbody>
                     {% for _, row in page_items.iterrows() %}
-                    <tr class="{{ 'correct-row' if row.get('correct') else 'incorrect-row' }}">
-                        <td>{{ row.get('gameDate', 'N/A')[:10] if row.get('gameDate') else 'N/A' }}</td>
+                    <tr class="{{ 'correct-row' if row.get('correct', False) else 'incorrect-row' }}">
+                        <td>{{ str(row.get('gameDate', 'N/A'))[:10] }}</td>
                         <td>{{ row.get('teamName', 'N/A') }}</td>
                         <td>{{ row.get('opponentTeamName', 'N/A') }}</td>
                         <td><span class="badge">{{ 'Home' if row.get('home') == 1 else 'Away' }}</span></td>
-                        {% for f in displayCols %}
+                        {% for f in display_cols %}
                         <td>{{ "{:.0f}".format(row.get(f, 0)) }}</td>
                         {% endfor %}
                         <td><span class="badge {{ 'win' if row.get('pred') == 1 else 'loss' }}">{{ 'W' if row.get('pred') == 1 else 'L' }}</span></td>
@@ -199,39 +189,37 @@ HTML = '''
 </html>
 '''
 
-# Build prediction data for ALL games (train + test), sorted by date descending
-all_X = pd.concat([X_train, X_test])
-all_y = pd.concat([y_train, y_test])
-all_preds = list(train_preds) + list(test_preds)
+# ── custom jinja filter ────────────────────────────────────────────────────
+def commatize(n):
+    return f"{int(n):,}"
 
-predictions_df = all_X.copy()
-predictions_df['actual'] = all_y.values
-predictions_df['pred'] = all_preds
-predictions_df['correct'] = predictions_df['pred'] == predictions_df['actual']
-predictions_df['gameDate'] = all_game_dates.loc[all_X.index].str[:10].values
-predictions_df['opponentTeamName'] = all_opponent_names.loc[all_X.index].values
-predictions_df['teamName'] = all_team_names.loc[all_X.index].values
-predictions_df['home'] = all_X['home'].values
-predictions_df = predictions_df.sort_values('gameDate', ascending=False)
+app.jinja_env.filters["commatize"] = commatize
 
-total_games = len(all_X)
-train_games = len(X_train)
-test_games = len(X_test)
-PER_PAGE = 20
-
+# ── routes ─────────────────────────────────────────────────────────────────
 @app.route('/')
 def index():
+    from flask import request
     page = request.args.get('page', 1, type=int)
     total_pages = (len(predictions_df) + PER_PAGE - 1) // PER_PAGE
     start = (page - 1) * PER_PAGE
-    end = start + PER_PAGE
+    end   = start + PER_PAGE
     page_items = predictions_df.iloc[start:end]
-    return render_template_string(HTML, page_items=page_items, featCols=featCols,
-                                   displayCols=displayCols, displayLabels=displayLabels,
-                                   test_acc=test_acc, train_acc=train_acc,
-                                   total_games=total_games, train_games=train_games, test_games=test_games,
-                                   page=page,
-                                   total_pages=total_pages, range=range)
+
+    return render_template_string(
+        HTML,
+        page_items     = page_items,
+        feat_cols      = feat_cols,
+        display_cols   = display_cols,
+        display_labels = display_labels,
+        test_accuracy  = test_acc,
+        train_accuracy = train_acc,
+        total_games    = total_games,
+        train_games    = train_games,
+        test_games     = test_games,
+        trained_at     = meta.get("trained_at", "unknown"),
+        page           = page,
+        total_pages    = total_pages,
+    )
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
