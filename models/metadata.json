@@ -1,9 +1,9 @@
 {
-  "trained_at": "2026-05-06 06:00:28",
-  "train_accuracy": 0.7533,
-  "test_accuracy": 0.7519,
-  "total_games": 138624,
-  "train_games": 124761,
+  "trained_at": "2026-05-07 06:00:28",
+  "train_accuracy": 0.7527,
+  "test_accuracy": 0.756,
+  "total_games": 138628,
+  "train_games": 124765,
   "test_games": 13863,
   "feature_cols": [
     "home",
