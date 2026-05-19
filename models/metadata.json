@@ -1,10 +1,10 @@
 {
-  "trained_at": "2026-05-18 06:00:26",
-  "train_accuracy": 0.7532,
-  "test_accuracy": 0.7521,
-  "total_games": 138660,
-  "train_games": 124794,
-  "test_games": 13866,
+  "trained_at": "2026-05-19 06:00:23",
+  "train_accuracy": 0.7528,
+  "test_accuracy": 0.7552,
+  "total_games": 138662,
+  "train_games": 124795,
+  "test_games": 13867,
   "feature_cols": [
     "home",
     "assists",
