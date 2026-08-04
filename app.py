@@ -1,10 +1,11 @@
 """NBA Win Predictor - Display model data and performance results."""
 
+import json
 import os
 
 import joblib
 import pandas as pd
-from flask import Flask, jsonify, render_template_string
+from flask import Flask, render_template_string
 
 REPO_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(REPO_DIR, "models")
@@ -17,7 +18,8 @@ meta_path  = os.path.join(MODEL_DIR, "metadata.json")
 pred_path  = os.path.join(MODEL_DIR, "predictions.csv")   # was saved as .csv (no pyarrow)
 
 model   = joblib.load(model_path)
-meta    = pd.read_json(meta_path, orient="records").iloc[0].to_dict()
+with open(meta_path) as f:
+    meta = json.load(f)
 
 feat_cols     = meta["feature_cols"]
 display_cols  = meta["display_cols"]
@@ -129,7 +131,6 @@ HTML = '''
                 <span><strong>P</strong> = Predicted Result</span>
                 <span><strong>A</strong> = Actual Result</span>
                 <span><strong>H/A</strong> = Home/Away</span>
-                <span><strong>A</strong> = Assists</span>
                 <span><strong>R</strong> = Rebounds</span>
                 <span><strong>B</strong> = Blocks</span>
                 <span><strong>S</strong> = Steals</span>
