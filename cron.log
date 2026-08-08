@@ -4519,3 +4519,177 @@ hint: See the 'Note about fast-forwards' in 'git push --help' for details.
 [2026-08-05 06:00:10] Git error: Command '['git', 'push', 'nba-ai', 'main']' returned non-zero exit status 1.
 
 [2026-08-05 06:00:10] ✓ Done! Test accuracy: 74.8%
+
+============================================================
+NBA AI Nightly Training — 2026-08-06 06:00:02
+============================================================
+
+[2026-08-06 06:00:02] Downloading dataset...
+Warning: Looks like you're using an outdated `kagglehub` version (installed: 0.3.13), please consider upgrading to the latest version (1.0.2).
+Downloading from https://www.kaggle.com/api/v1/datasets/download/eoinamoore/historical-nba-data-and-player-box-scores?dataset_version_number=515...
+  0%|          | 0.00/1.03G [00:00<?, ?B/s]  0%|          | 1.00M/1.03G [00:00<04:08, 4.46MB/s]  1%|          | 6.00M/1.03G [00:00<00:50, 21.8MB/s]  1%|▏         | 14.0M/1.03G [00:00<00:25, 42.9MB/s]  2%|▏         | 22.0M/1.03G [00:00<00:19, 55.1MB/s]  3%|▎         | 30.0M/1.03G [00:00<00:21, 50.9MB/s]  4%|▎         | 39.0M/1.03G [00:00<00:17, 61.0MB/s]  5%|▍         | 48.0M/1.03G [00:00<00:15, 68.5MB/s]  5%|▌         | 57.0M/1.03G [00:01<00:14, 73.6MB/s]  6%|▌         | 65.0M/1.03G [00:01<00:17, 60.2MB/s]  7%|▋         | 72.0M/1.03G [00:01<00:16, 63.0MB/s]  8%|▊         | 81.0M/1.03G [00:01<00:14, 69.5MB/s]  9%|▊         | 90.0M/1.03G [00:01<00:13, 74.1MB/s]  9%|▉         | 99.0M/1.03G [00:01<00:12, 78.0MB/s] 10%|█         | 107M/1.03G [00:01<00:17, 58.4MB/s]  11%|█         | 114M/1.03G [00:02<00:16, 60.0MB/s] 11%|█▏        | 121M/1.03G [00:02<00:16, 60.2MB/s] 12%|█▏        | 128M/1.03G [00:02<00:19, 49.9MB/s] 13%|█▎        | 135M/1.03G [00:02<00:18, 53.6MB/s] 13%|█▎        | 141M/1.03G [00:02<00:18, 53.2MB/s] 14%|█▍        | 147M/1.03G [00:02<00:17, 54.7MB/s] 14%|█▍        | 153M/1.03G [00:02<00:19, 49.9MB/s] 15%|█▌        | 162M/1.03G [00:02<00:15, 59.6MB/s] 16%|█▌        | 171M/1.03G [00:03<00:13, 66.5MB/s] 17%|█▋        | 180M/1.03G [00:03<00:12, 72.2MB/s] 18%|█▊        | 188M/1.03G [00:03<00:14, 63.3MB/s] 19%|█▊        | 197M/1.03G [00:03<00:12, 69.6MB/s] 19%|█▉        | 206M/1.03G [00:03<00:12, 74.2MB/s] 20%|██        | 214M/1.03G [00:03<00:11, 75.4MB/s] 21%|██        | 223M/1.03G [00:03<00:11, 78.6MB/s] 22%|██▏       | 231M/1.03G [00:03<00:13, 65.2MB/s] 23%|██▎       | 240M/1.03G [00:04<00:12, 70.8MB/s] 24%|██▎       | 249M/1.03G [00:04<00:11, 75.0MB/s] 24%|██▍       | 258M/1.03G [00:04<00:10, 78.5MB/s] 25%|██▌       | 266M/1.03G [00:04<00:12, 65.8MB/s] 26%|██▌       | 275M/1.03G [00:04<00:11, 71.1MB/s] 27%|██▋       | 284M/1.03G [00:04<00:10, 75.3MB/s] 28%|██▊       | 293M/1.03G [00:04<00:10, 78.5MB/s] 28%|██▊       | 301M/1.03G [00:05<00:13, 60.1MB/s] 29%|██▉       | 310M/1.03G [00:05<00:11, 66.3MB/s] 30%|███       | 319M/1.03G [00:05<00:10, 71.2MB/s] 31%|███       | 328M/1.03G [00:05<00:10, 75.1MB/s] 32%|███▏      | 336M/1.03G [00:05<00:11, 66.2MB/s] 33%|███▎      | 345M/1.03G [00:05<00:10, 71.3MB/s] 33%|███▎      | 354M/1.03G [00:05<00:09, 75.5MB/s] 34%|███▍      | 363M/1.03G [00:05<00:09, 78.1MB/s] 35%|███▌      | 371M/1.03G [00:06<00:10, 67.3MB/s] 36%|███▌      | 380M/1.03G [00:06<00:09, 72.4MB/s] 37%|███▋      | 389M/1.03G [00:06<00:09, 76.3MB/s] 38%|███▊      | 398M/1.03G [00:06<00:08, 79.0MB/s] 38%|███▊      | 406M/1.03G [00:06<00:10, 67.7MB/s] 39%|███▉      | 413M/1.03G [00:06<00:10, 64.2MB/s] 40%|███▉      | 420M/1.03G [00:06<00:13, 49.5MB/s] 40%|████      | 426M/1.03G [00:07<00:14, 47.3MB/s] 41%|████      | 434M/1.03G [00:07<00:12, 53.9MB/s] 42%|████▏     | 443M/1.03G [00:07<00:10, 61.6MB/s] 43%|████▎     | 451M/1.03G [00:07<00:09, 65.2MB/s] 43%|████▎     | 459M/1.03G [00:07<00:10, 57.9MB/s] 44%|████▍     | 466M/1.03G [00:07<00:10, 61.3MB/s] 45%|████▍     | 473M/1.03G [00:07<00:13, 46.2MB/s] 45%|████▌     | 479M/1.03G [00:08<00:13, 44.3MB/s] 46%|████▌     | 484M/1.03G [00:08<00:13, 45.5MB/s] 46%|████▋     | 492M/1.03G [00:08<00:11, 53.7MB/s] 47%|████▋     | 501M/1.03G [00:08<00:09, 62.4MB/s] 48%|████▊     | 510M/1.03G [00:08<00:08, 68.9MB/s] 49%|████▉     | 517M/1.03G [00:08<00:09, 58.2MB/s] 50%|████▉     | 525M/1.03G [00:08<00:09, 61.7MB/s] 50%|█████     | 532M/1.03G [00:08<00:08, 61.5MB/s] 51%|█████     | 539M/1.03G [00:09<00:10, 50.8MB/s] 51%|█████▏    | 545M/1.03G [00:09<00:10, 53.3MB/s] 52%|█████▏    | 551M/1.03G [00:09<00:10, 50.4MB/s] 53%|█████▎    | 557M/1.03G [00:09<00:10, 48.2MB/s] 53%|█████▎    | 562M/1.03G [00:09<00:12, 41.7MB/s] 54%|█████▎    | 567M/1.03G [00:09<00:12, 42.9MB/s] 54%|█████▍    | 572M/1.03G [00:09<00:11, 43.1MB/s] 55%|█████▍    | 577M/1.03G [00:10<00:11, 42.6MB/s] 55%|█████▍    | 582M/1.03G [00:10<00:13, 36.2MB/s] 56%|█████▌    | 591M/1.03G [00:10<00:10, 48.0MB/s] 57%|█████▋    | 600M/1.03G [00:10<00:08, 57.7MB/s] 58%|█████▊    | 609M/1.03G [00:10<00:07, 65.3MB/s] 58%|█████▊    | 616M/1.03G [00:10<00:07, 58.9MB/s] 59%|█████▉    | 624M/1.03G [00:10<00:07, 64.3MB/s] 60%|█████▉    | 633M/1.03G [00:10<00:06, 70.2MB/s] 61%|██████    | 641M/1.03G [00:11<00:05, 73.4MB/s] 61%|██████▏   | 649M/1.03G [00:11<00:06, 64.0MB/s] 62%|██████▏   | 658M/1.03G [00:11<00:05, 70.1MB/s] 63%|██████▎   | 667M/1.03G [00:11<00:05, 74.6MB/s] 64%|██████▍   | 676M/1.03G [00:11<00:05, 78.0MB/s] 65%|██████▍   | 685M/1.03G [00:11<00:04, 80.5MB/s] 65%|██████▌   | 693M/1.03G [00:11<00:05, 67.3MB/s] 66%|██████▋   | 702M/1.03G [00:11<00:05, 72.5MB/s] 67%|██████▋   | 711M/1.03G [00:12<00:04, 76.8MB/s] 68%|██████▊   | 719M/1.03G [00:12<00:04, 78.5MB/s] 69%|██████▊   | 727M/1.03G [00:12<00:05, 61.4MB/s] 69%|██████▉   | 735M/1.03G [00:12<00:05, 65.7MB/s] 70%|███████   | 744M/1.03G [00:12<00:04, 71.4MB/s] 71%|███████   | 753M/1.03G [00:12<00:04, 75.2MB/s] 72%|███████▏  | 761M/1.03G [00:12<00:05, 62.4MB/s] 73%|███████▎  | 770M/1.03G [00:12<00:04, 68.5MB/s] 74%|███████▎  | 779M/1.03G [00:13<00:03, 73.4MB/s] 74%|███████▍  | 788M/1.03G [00:13<00:03, 77.1MB/s] 75%|███████▌  | 796M/1.03G [00:13<00:04, 66.3MB/s] 76%|███████▌  | 805M/1.03G [00:13<00:03, 71.5MB/s] 77%|███████▋  | 814M/1.03G [00:13<00:03, 75.6MB/s] 78%|███████▊  | 823M/1.03G [00:13<00:03, 78.7MB/s] 79%|███████▊  | 831M/1.03G [00:13<00:03, 67.7MB/s] 79%|███████▉  | 840M/1.03G [00:13<00:03, 72.6MB/s] 80%|████████  | 849M/1.03G [00:14<00:02, 75.8MB/s] 81%|████████  | 858M/1.03G [00:14<00:02, 78.8MB/s] 82%|████████▏ | 866M/1.03G [00:14<00:03, 66.6MB/s] 82%|████████▏ | 873M/1.03G [00:14<00:02, 68.3MB/s] 83%|████████▎ | 882M/1.03G [00:14<00:02, 72.9MB/s] 84%|████████▍ | 891M/1.03G [00:14<00:02, 76.8MB/s] 85%|████████▍ | 899M/1.03G [00:14<00:02, 78.0MB/s] 86%|████████▌ | 907M/1.03G [00:14<00:02, 65.9MB/s] 87%|████████▋ | 916M/1.03G [00:15<00:02, 71.2MB/s] 87%|████████▋ | 925M/1.03G [00:15<00:01, 75.4MB/s] 88%|████████▊ | 934M/1.03G [00:15<00:01, 78.5MB/s] 89%|████████▉ | 942M/1.03G [00:15<00:01, 66.7MB/s] 90%|████████▉ | 951M/1.03G [00:15<00:01, 71.9MB/s] 91%|█████████ | 960M/1.03G [00:15<00:01, 76.0MB/s] 92%|█████████▏| 969M/1.03G [00:15<00:01, 78.8MB/s] 92%|█████████▏| 977M/1.03G [00:15<00:01, 67.5MB/s] 93%|█████████▎| 986M/1.03G [00:16<00:01, 72.4MB/s] 94%|█████████▍| 995M/1.03G [00:16<00:00, 76.3MB/s] 95%|█████████▍| 0.98G/1.03G [00:16<00:00, 78.2MB/s] 96%|█████████▌| 0.99G/1.03G [00:16<00:00, 67.7MB/s] 96%|█████████▋| 1.00G/1.03G [00:16<00:00, 72.2MB/s] 97%|█████████▋| 1.01G/1.03G [00:16<00:00, 76.3MB/s] 98%|█████████▊| 1.01G/1.03G [00:16<00:00, 79.2MB/s] 99%|█████████▉| 1.02G/1.03G [00:16<00:00, 81.7MB/s]100%|█████████▉| 1.03G/1.03G [00:17<00:00, 68.8MB/s]100%|██████████| 1.03G/1.03G [00:17<00:00, 64.9MB/s]
+Extracting files...
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:200: RuntimeWarning: divide by zero encountered in matmul
+  raw_prediction = X @ weights + intercept
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:200: RuntimeWarning: overflow encountered in matmul
+  raw_prediction = X @ weights + intercept
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:200: RuntimeWarning: invalid value encountered in matmul
+  raw_prediction = X @ weights + intercept
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:330: RuntimeWarning: divide by zero encountered in matmul
+  grad[:n_features] = X.T @ grad_pointwise + l2_reg_strength * weights
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:330: RuntimeWarning: overflow encountered in matmul
+  grad[:n_features] = X.T @ grad_pointwise + l2_reg_strength * weights
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:330: RuntimeWarning: invalid value encountered in matmul
+  grad[:n_features] = X.T @ grad_pointwise + l2_reg_strength * weights
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: divide by zero encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: overflow encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: invalid value encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: divide by zero encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: overflow encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: invalid value encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: divide by zero encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: overflow encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: invalid value encountered in matmul
+  ret = a @ b
+[nightly-dev/2026-08-06 a3191e7] nightly: retrain 2026-08-06 06:00:27
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+To github.com:t0mtait/nba-ai.git
+ ! [rejected]        main -> main (non-fast-forward)
+error: failed to push some refs to 'github.com:t0mtait/nba-ai.git'
+hint: Updates were rejected because a pushed branch tip is behind its remote
+hint: counterpart. If you want to integrate the remote changes, use 'git pull'
+hint: before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+[2026-08-06 06:00:25] Loaded 146,560 rows, date range: 1946-11-26 19:00:00 → 2026-06-13 20:30:00
+[2026-08-06 06:00:25] After dropna: 138,694 games
+
+[2026-08-06 06:00:26] Accuracy — Train: 0.7537  Test: 0.7484
+[2026-08-06 06:00:27] Saved: /Users/tomtait/Repositories/nba-ai/models/model.joblib
+[2026-08-06 06:00:27] Saved: /Users/tomtait/Repositories/nba-ai/models/predictions.csv
+[2026-08-06 06:00:27] Saved: /Users/tomtait/Repositories/nba-ai/models/metadata.json
+[2026-08-06 06:00:27] Committed: nightly: retrain 2026-08-06 06:00:27
+[2026-08-06 06:00:28] Git error: Command '['git', 'push', 'nba-ai', 'main']' returned non-zero exit status 1.
+
+[2026-08-06 06:00:28] ✓ Done! Test accuracy: 74.8%
+
+============================================================
+NBA AI Nightly Training — 2026-08-07 06:00:05
+============================================================
+
+[2026-08-07 06:00:05] Downloading dataset...
+Warning: Looks like you're using an outdated `kagglehub` version (installed: 0.3.13), please consider upgrading to the latest version (1.0.2).
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:200: RuntimeWarning: divide by zero encountered in matmul
+  raw_prediction = X @ weights + intercept
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:200: RuntimeWarning: overflow encountered in matmul
+  raw_prediction = X @ weights + intercept
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:200: RuntimeWarning: invalid value encountered in matmul
+  raw_prediction = X @ weights + intercept
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:330: RuntimeWarning: divide by zero encountered in matmul
+  grad[:n_features] = X.T @ grad_pointwise + l2_reg_strength * weights
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:330: RuntimeWarning: overflow encountered in matmul
+  grad[:n_features] = X.T @ grad_pointwise + l2_reg_strength * weights
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:330: RuntimeWarning: invalid value encountered in matmul
+  grad[:n_features] = X.T @ grad_pointwise + l2_reg_strength * weights
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: divide by zero encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: overflow encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: invalid value encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: divide by zero encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: overflow encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: invalid value encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: divide by zero encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: overflow encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: invalid value encountered in matmul
+  ret = a @ b
+[nightly-dev/2026-08-07 7620b45] nightly: retrain 2026-08-07 06:00:08
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+To github.com:t0mtait/nba-ai.git
+ ! [rejected]        main -> main (non-fast-forward)
+error: failed to push some refs to 'github.com:t0mtait/nba-ai.git'
+hint: Updates were rejected because a pushed branch tip is behind its remote
+hint: counterpart. If you want to integrate the remote changes, use 'git pull'
+hint: before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+[2026-08-07 06:00:07] Loaded 146,560 rows, date range: 1946-11-26 19:00:00 → 2026-06-13 20:30:00
+[2026-08-07 06:00:07] After dropna: 138,694 games
+
+[2026-08-07 06:00:07] Accuracy — Train: 0.7537  Test: 0.7484
+[2026-08-07 06:00:08] Saved: /Users/tomtait/Repositories/nba-ai/models/model.joblib
+[2026-08-07 06:00:08] Saved: /Users/tomtait/Repositories/nba-ai/models/predictions.csv
+[2026-08-07 06:00:08] Saved: /Users/tomtait/Repositories/nba-ai/models/metadata.json
+[2026-08-07 06:00:08] Committed: nightly: retrain 2026-08-07 06:00:08
+[2026-08-07 06:00:09] Git error: Command '['git', 'push', 'nba-ai', 'main']' returned non-zero exit status 1.
+
+[2026-08-07 06:00:09] ✓ Done! Test accuracy: 74.8%
+
+============================================================
+NBA AI Nightly Training — 2026-08-08 06:00:05
+============================================================
+
+[2026-08-08 06:00:05] Downloading dataset...
+Warning: Looks like you're using an outdated `kagglehub` version (installed: 0.3.13), please consider upgrading to the latest version (1.0.2).
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:200: RuntimeWarning: divide by zero encountered in matmul
+  raw_prediction = X @ weights + intercept
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:200: RuntimeWarning: overflow encountered in matmul
+  raw_prediction = X @ weights + intercept
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:200: RuntimeWarning: invalid value encountered in matmul
+  raw_prediction = X @ weights + intercept
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:330: RuntimeWarning: divide by zero encountered in matmul
+  grad[:n_features] = X.T @ grad_pointwise + l2_reg_strength * weights
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:330: RuntimeWarning: overflow encountered in matmul
+  grad[:n_features] = X.T @ grad_pointwise + l2_reg_strength * weights
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/linear_model/_linear_loss.py:330: RuntimeWarning: invalid value encountered in matmul
+  grad[:n_features] = X.T @ grad_pointwise + l2_reg_strength * weights
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: divide by zero encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: overflow encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: invalid value encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: divide by zero encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: overflow encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: invalid value encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: divide by zero encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: overflow encountered in matmul
+  ret = a @ b
+/Users/tomtait/Library/Python/3.9/lib/python/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: invalid value encountered in matmul
+  ret = a @ b
+[nightly-dev/2026-08-07 595bfd4] nightly: retrain 2026-08-08 06:00:07
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+To github.com:t0mtait/nba-ai.git
+ ! [rejected]        main -> main (non-fast-forward)
+error: failed to push some refs to 'github.com:t0mtait/nba-ai.git'
+hint: Updates were rejected because a pushed branch tip is behind its remote
+hint: counterpart. If you want to integrate the remote changes, use 'git pull'
+hint: before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+[2026-08-08 06:00:06] Loaded 146,560 rows, date range: 1946-11-26 19:00:00 → 2026-06-13 20:30:00
+[2026-08-08 06:00:06] After dropna: 138,694 games
+
+[2026-08-08 06:00:06] Accuracy — Train: 0.7537  Test: 0.7484
+[2026-08-08 06:00:07] Saved: /Users/tomtait/Repositories/nba-ai/models/model.joblib
+[2026-08-08 06:00:07] Saved: /Users/tomtait/Repositories/nba-ai/models/predictions.csv
+[2026-08-08 06:00:07] Saved: /Users/tomtait/Repositories/nba-ai/models/metadata.json
+[2026-08-08 06:00:08] Committed: nightly: retrain 2026-08-08 06:00:07
+[2026-08-08 06:00:08] Git error: Command '['git', 'push', 'nba-ai', 'main']' returned non-zero exit status 1.
+
+[2026-08-08 06:00:08] ✓ Done! Test accuracy: 74.8%
