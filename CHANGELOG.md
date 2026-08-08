@@ -1,3 +1,11 @@
+# [2.1.0](https://github.com/t0mtait/nba-ai/compare/v2.0.0...v2.1.0) (2026-08-08)
+
+
+### Features
+
+* add nightly training pipeline + cron job ([f5cd4ea](https://github.com/t0mtait/nba-ai/commit/f5cd4eaa386b9fc2320098d2b699f3eae76a49d3))
+* railway config setup ([198ca77](https://github.com/t0mtait/nba-ai/commit/198ca77162b4191d8f375e002710eae04a47876a))
+
 # [2.0.0](https://github.com/t0mtait/nba-ai/compare/v1.0.0...v2.0.0) (2026-07-29)
 
 
