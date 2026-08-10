@@ -158,7 +158,7 @@ HTML = '''
                 <tbody>
                     {% for _, row in page_items.iterrows() %}
                     <tr class="{{ 'correct-row' if row.get('correct', False) else 'incorrect-row' }}">
-                        <td>{{ str(row.get('gameDate', 'N/A'))[:10] }}</td>
+                        <td>{{ (row.get('gameDate', 'N/A') | to_str)[:10] }}</td>
                         <td>{{ row.get('teamName', 'N/A') }}</td>
                         <td>{{ row.get('opponentTeamName', 'N/A') }}</td>
                         <td><span class="badge">{{ 'Home' if row.get('home') == 1 else 'Away' }}</span></td>
@@ -194,7 +194,11 @@ HTML = '''
 def commatize(n):
     return f"{int(n):,}"
 
+def to_str(val):
+    return str(val)
+
 app.jinja_env.filters["commatize"] = commatize
+app.jinja_env.filters["to_str"] = to_str
 
 # ── routes ─────────────────────────────────────────────────────────────────
 @app.route('/')
