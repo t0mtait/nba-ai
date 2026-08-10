@@ -18,4 +18,4 @@ ENV PORT=5000
 
 EXPOSE ${PORT}
 
-CMD ["flask", "run", "--host=0.0.0.0", "--port=${PORT}"]
+CMD sh -c "flask run --host=0.0.0.0 --port=$PORT"
