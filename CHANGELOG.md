@@ -1,3 +1,10 @@
+## [2.1.2](https://github.com/t0mtait/nba-ai/compare/v2.1.1...v2.1.2) (2026-08-10)
+
+
+### Bug Fixes
+
+* added missing to_str ([b1303b3](https://github.com/t0mtait/nba-ai/commit/b1303b322af1c51a1a15ac0f8275d9624177e571))
+
 ## [2.1.1](https://github.com/t0mtait/nba-ai/compare/v2.1.0...v2.1.1) (2026-08-10)
 
 
