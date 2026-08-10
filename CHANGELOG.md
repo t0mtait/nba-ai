@@ -1,3 +1,10 @@
+## [2.1.1](https://github.com/t0mtait/nba-ai/compare/v2.1.0...v2.1.1) (2026-08-10)
+
+
+### Bug Fixes
+
+* dockerfile change for 500 fix ([f0f22b6](https://github.com/t0mtait/nba-ai/commit/f0f22b64bde85c140fa68aa2d95c468ee7f9c272))
+
 # [2.1.0](https://github.com/t0mtait/nba-ai/compare/v2.0.0...v2.1.0) (2026-08-08)
 
 
