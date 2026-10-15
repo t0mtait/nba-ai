@@ -1,3 +1,10 @@
+## [2.1.3](https://github.com/t0mtait/nba-ai/compare/v2.1.2...v2.1.3) (2026-10-15)
+
+
+### Bug Fixes
+
+* updates ([10a8052](https://github.com/t0mtait/nba-ai/commit/10a80525bb2887751febdc9f19cbfab114b4c2eb))
+
 ## [2.1.2](https://github.com/t0mtait/nba-ai/compare/v2.1.1...v2.1.2) (2026-08-10)
 
 
