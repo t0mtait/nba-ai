@@ -1,19 +1,23 @@
 """NBA Win Predictor - Display model data and performance results."""
-import pandas as pd
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import make_pipeline
-from flask import Flask, jsonify, request, render_template_string
-import kagglehub
 import os
+import shutil
+import threading
+import time
+import kagglehub
+import pandas as pd
+from flask import Flask, jsonify, make_response, request, render_template_string
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 app = Flask(__name__)
 
-# Load data once at startup
-path = kagglehub.dataset_download("eoinamoore/historical-nba-data-and-player-box-scores")
-df = pd.read_csv(f"{path}/TeamStatistics.csv")
+DATASET_HANDLE = "eoinamoore/historical-nba-data-and-player-box-scores"
+DATASET_FILE = "TeamStatistics.csv"
+REFRESH_INTERVAL_SECONDS = int(os.environ.get("REFRESH_INTERVAL_SECONDS", "3600"))
+
 featCols = ['teamId', 'home', 'assists', 'reboundsTotal', 'blocks', 'steals',
             'turnovers', 'foulsPersonal', 'q1Points', 'q2Points',
             'fieldGoalsAttempted', 'threePointersAttempted', 'freeThrowsAttempted']
@@ -23,25 +27,124 @@ displayCols = ['assists', 'reboundsTotal', 'blocks', 'steals', 'turnovers',
                'fieldGoalsAttempted', 'threePointersAttempted', 'freeThrowsAttempted']
 # Display labels for table headers (matches displayCols order)
 displayLabels = ['A', 'R', 'B', 'S', 'TO', 'F', 'Q1', 'Q2', 'FGA', '3FA', 'FTA']
-# Preserve columns before dropna for display
-all_game_dates = df['gameDate'].astype(str)
-all_opponent_names = df['opponentTeamName']
-all_team_names = df['teamName']
-df = df.dropna(subset=featCols + ['win'])
-X = df[featCols]
-y = df['win']
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
+_refresh_lock = threading.Lock()
+_state = {
+    "model": None,
+    "predictions_df": pd.DataFrame(),
+    "train_acc": 0.0,
+    "test_acc": 0.0,
+    "total_games": 0,
+    "train_games": 0,
+    "test_games": 0,
+    "last_updated": 0.0,
+}
 
-model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=2000, random_state=0))
-model.fit(X_train, y_train)
-acc = model.score(X_test, y_test)
 
-# Model results
-train_preds = model.predict(X_train)
-test_preds = model.predict(X_test)
-train_acc = accuracy_score(y_train, train_preds)
-test_acc = accuracy_score(y_test, test_preds)
+def _cleanup_old_cache_versions(csv_path: str) -> None:
+    """Remove older cached dataset versions so container disk usage stays bounded."""
+    try:
+        current_version_dir = os.path.dirname(os.path.abspath(csv_path))
+        versions_dir = os.path.dirname(current_version_dir)
+        if os.path.basename(versions_dir) != "versions" or not os.path.isdir(versions_dir):
+            return
+        for entry in os.listdir(versions_dir):
+            candidate = os.path.join(versions_dir, entry)
+            if os.path.abspath(candidate) != current_version_dir and os.path.isdir(candidate):
+                shutil.rmtree(candidate, ignore_errors=True)
+    except Exception:
+        pass
+
+
+def refresh_data(force_download: bool = True) -> None:
+    """Download the latest Kaggle dataset and retrain the model."""
+    with _refresh_lock:
+        path = kagglehub.dataset_download(
+            DATASET_HANDLE,
+            path=DATASET_FILE,
+            force_download=force_download,
+        )
+        csv_path = os.path.join(path, DATASET_FILE) if os.path.isdir(path) else path
+        _cleanup_old_cache_versions(csv_path)
+
+        df = pd.read_csv(csv_path, low_memory=False)
+        # Preserve columns before dropna for display
+        date_col = 'gameDate' if 'gameDate' in df.columns else 'gameDateTimeEst'
+        all_game_dates = df[date_col].astype(str)
+        all_opponent_names = df['opponentTeamName']
+        all_team_names = df['teamName']
+
+        df = df.dropna(subset=featCols + ['win'])
+        X = df[featCols]
+        y = df['win']
+
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
+
+        model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=2000, random_state=0))
+        model.fit(X_train, y_train)
+
+        train_preds = model.predict(X_train)
+        test_preds = model.predict(X_test)
+        train_acc = accuracy_score(y_train, train_preds)
+        test_acc = accuracy_score(y_test, test_preds)
+
+        # Build prediction data for ALL games (train + test), sorted by date descending
+        all_X = pd.concat([X_train, X_test])
+        all_y = pd.concat([y_train, y_test])
+        all_preds = list(train_preds) + list(test_preds)
+
+        predictions_df = all_X.copy()
+        predictions_df['actual'] = all_y.values
+        predictions_df['pred'] = all_preds
+        predictions_df['correct'] = predictions_df['pred'] == predictions_df['actual']
+        predictions_df['_sortDate'] = all_game_dates.loc[all_X.index].values
+        predictions_df['gameDate'] = all_game_dates.loc[all_X.index].str[:10].values
+        predictions_df['opponentTeamName'] = all_opponent_names.loc[all_X.index].values
+        predictions_df['teamName'] = all_team_names.loc[all_X.index].values
+        predictions_df['home'] = all_X['home'].values
+        predictions_df = (
+            predictions_df.sort_index()
+            .sort_values('_sortDate', ascending=False, kind='mergesort')
+            .drop(columns=['_sortDate'])
+        )
+
+        _state.update({
+            "model": model,
+            "predictions_df": predictions_df,
+            "train_acc": train_acc,
+            "test_acc": test_acc,
+            "total_games": len(all_X),
+            "train_games": len(X_train),
+            "test_games": len(X_test),
+            "last_updated": time.time(),
+        })
+
+
+def ensure_fresh_data() -> None:
+    """Refresh data if TTL has expired."""
+    if time.time() - _state["last_updated"] >= REFRESH_INTERVAL_SECONDS:
+        try:
+            refresh_data(force_download=True)
+        except Exception as exc:
+            app.logger.warning("Failed to refresh dataset: %s", exc)
+            if _state["predictions_df"].empty:
+                raise
+
+
+def _background_refresh_loop() -> None:
+    """Periodically refresh dataset in the background."""
+    while True:
+        time.sleep(REFRESH_INTERVAL_SECONDS)
+        try:
+            refresh_data(force_download=True)
+        except Exception as exc:
+            app.logger.warning("Background dataset refresh failed: %s", exc)
+
+
+# Load initial data at startup and launch periodic refresh thread
+refresh_data(force_download=True)
+_refresh_thread = threading.Thread(target=_background_refresh_loop, daemon=True)
+_refresh_thread.start()
 
 
 HTML = '''
@@ -199,39 +302,37 @@ HTML = '''
 </html>
 '''
 
-# Build prediction data for ALL games (train + test), sorted by date descending
-all_X = pd.concat([X_train, X_test])
-all_y = pd.concat([y_train, y_test])
-all_preds = list(train_preds) + list(test_preds)
-
-predictions_df = all_X.copy()
-predictions_df['actual'] = all_y.values
-predictions_df['pred'] = all_preds
-predictions_df['correct'] = predictions_df['pred'] == predictions_df['actual']
-predictions_df['gameDate'] = all_game_dates.loc[all_X.index].str[:10].values
-predictions_df['opponentTeamName'] = all_opponent_names.loc[all_X.index].values
-predictions_df['teamName'] = all_team_names.loc[all_X.index].values
-predictions_df['home'] = all_X['home'].values
-predictions_df = predictions_df.sort_values('gameDate', ascending=False)
-
-total_games = len(all_X)
-train_games = len(X_train)
-test_games = len(X_test)
 PER_PAGE = 20
+
 
 @app.route('/')
 def index():
+    ensure_fresh_data()
+    predictions_df = _state["predictions_df"]
     page = request.args.get('page', 1, type=int)
-    total_pages = (len(predictions_df) + PER_PAGE - 1) // PER_PAGE
+    total_pages = max(1, (len(predictions_df) + PER_PAGE - 1) // PER_PAGE)
     start = (page - 1) * PER_PAGE
     end = start + PER_PAGE
     page_items = predictions_df.iloc[start:end]
-    return render_template_string(HTML, page_items=page_items, featCols=featCols,
-                                   displayCols=displayCols, displayLabels=displayLabels,
-                                   test_acc=test_acc, train_acc=train_acc,
-                                   total_games=total_games, train_games=train_games, test_games=test_games,
-                                   page=page,
-                                   total_pages=total_pages, range=range)
+    rendered = render_template_string(
+        HTML,
+        page_items=page_items,
+        featCols=featCols,
+        displayCols=displayCols,
+        displayLabels=displayLabels,
+        test_acc=_state["test_acc"],
+        train_acc=_state["train_acc"],
+        total_games=_state["total_games"],
+        train_games=_state["train_games"],
+        test_games=_state["test_games"],
+        page=page,
+        total_pages=total_pages,
+        range=range,
+    )
+    response = make_response(rendered)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
