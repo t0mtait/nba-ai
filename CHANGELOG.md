@@ -1,3 +1,10 @@
+## [2.1.4](https://github.com/t0mtait/nba-ai/compare/v2.1.3...v2.1.4) (2026-10-30)
+
+
+### Bug Fixes
+
+* auto-refresh dataset and model predictions to always include latest games ([c7f0536](https://github.com/t0mtait/nba-ai/commit/c7f053647836aeb718aac2a625792196f10b4f28))
+
 ## [2.1.3](https://github.com/t0mtait/nba-ai/compare/v2.1.2...v2.1.3) (2026-10-15)
 
 
