@@ -3,6 +3,7 @@ import os
 import shutil
 import threading
 import time
+from datetime import datetime, timezone
 import kagglehub
 import pandas as pd
 from flask import Flask, jsonify, make_response, request, render_template_string
@@ -11,13 +12,6 @@ from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-
-import joblib
-import pandas as pd
-from flask import Flask, render_template_string
-
-REPO_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_DIR = os.path.join(REPO_DIR, "models")
 
 app = Flask(__name__)
 
@@ -45,6 +39,7 @@ _state = {
     "train_games": 0,
     "test_games": 0,
     "last_updated": 0.0,
+    "trained_at": "unknown",
 }
 
 
@@ -124,6 +119,7 @@ def refresh_data(force_download: bool = True) -> None:
             "train_games": len(X_train),
             "test_games": len(X_test),
             "last_updated": time.time(),
+            "trained_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         })
 
 
@@ -153,10 +149,17 @@ refresh_data(force_download=True)
 _refresh_thread = threading.Thread(target=_background_refresh_loop, daemon=True)
 _refresh_thread.start()
 
-# Predictions (newest first)
-predictions_df = pd.read_csv(pred_path)
-
 PER_PAGE = 20
+
+# ── custom jinja filters ───────────────────────────────────────────────────
+def commatize(n):
+    return f"{int(n):,}"
+
+def to_str(val):
+    return str(val)
+
+app.jinja_env.filters["commatize"] = commatize
+app.jinja_env.filters["to_str"] = to_str
 
 # ── HTML template ─────────────────────────────────────────────────────────────
 HTML = '''
@@ -174,7 +177,7 @@ HTML = '''
         h1 { font-size: 1.5rem; font-weight: 800; }
         h1 span { color: #3ecf6a; }
         .tagline { color: #888899; font-size: 0.85rem; margin-bottom: 8px; }
-        .trained-tag { color: #888899; font-size: 0.75rem; }
+        .trained-tag { color: #888899; font-size: 0.75rem; margin-bottom: 24px; }
         .trained-tag span { color: #aaa; }
         .dataset-btn { display: inline-block; padding: 8px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #888899; text-decoration: none; font-size: 0.8rem; transition: all 0.2s; }
         .dataset-btn:hover { background: rgba(255,255,255,0.1); color: #f0f0f5; }
@@ -254,6 +257,7 @@ HTML = '''
                 <span><strong>P</strong> = Predicted Result</span>
                 <span><strong>A</strong> = Actual Result</span>
                 <span><strong>H/A</strong> = Home/Away</span>
+                <span><strong>A</strong> = Assists</span>
                 <span><strong>R</strong> = Rebounds</span>
                 <span><strong>B</strong> = Blocks</span>
                 <span><strong>S</strong> = Steals</span>
@@ -313,8 +317,6 @@ HTML = '''
 </html>
 '''
 
-PER_PAGE = 20
-
 
 @app.route('/')
 def index():
@@ -323,19 +325,25 @@ def index():
     page = request.args.get('page', 1, type=int)
     total_pages = max(1, (len(predictions_df) + PER_PAGE - 1) // PER_PAGE)
     start = (page - 1) * PER_PAGE
-    end   = start + PER_PAGE
+    end = start + PER_PAGE
     page_items = predictions_df.iloc[start:end]
     rendered = render_template_string(
         HTML,
         page_items=page_items,
+        feat_cols=featCols,
+        display_cols=displayCols,
+        display_labels=displayLabels,
         featCols=featCols,
         displayCols=displayCols,
         displayLabels=displayLabels,
+        test_accuracy=_state["test_acc"],
+        train_accuracy=_state["train_acc"],
         test_acc=_state["test_acc"],
         train_acc=_state["train_acc"],
         total_games=_state["total_games"],
         train_games=_state["train_games"],
         test_games=_state["test_games"],
+        trained_at=_state["trained_at"],
         page=page,
         total_pages=total_pages,
         range=range,
