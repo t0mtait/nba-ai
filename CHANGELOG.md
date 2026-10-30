@@ -1,3 +1,10 @@
+## [2.1.5](https://github.com/t0mtait/nba-ai/compare/v2.1.4...v2.1.5) (2026-10-30)
+
+
+### Bug Fixes
+
+* resolve broken merge in app.py causing startup NameError and Jinja filter errors ([01f2e2c](https://github.com/t0mtait/nba-ai/commit/01f2e2c154a8480d56415cc64e8f09c28cbc4412))
+
 ## [2.1.4](https://github.com/t0mtait/nba-ai/compare/v2.1.3...v2.1.4) (2026-10-30)
 
 
