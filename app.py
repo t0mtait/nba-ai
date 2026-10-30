@@ -12,6 +12,13 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+import joblib
+import pandas as pd
+from flask import Flask, render_template_string
+
+REPO_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_DIR = os.path.join(REPO_DIR, "models")
+
 app = Flask(__name__)
 
 DATASET_HANDLE = "eoinamoore/historical-nba-data-and-player-box-scores"
@@ -146,7 +153,12 @@ refresh_data(force_download=True)
 _refresh_thread = threading.Thread(target=_background_refresh_loop, daemon=True)
 _refresh_thread.start()
 
+# Predictions (newest first)
+predictions_df = pd.read_csv(pred_path)
 
+PER_PAGE = 20
+
+# ── HTML template ─────────────────────────────────────────────────────────────
 HTML = '''
 <!DOCTYPE html>
 <html>
@@ -161,7 +173,9 @@ HTML = '''
         .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 4px; }
         h1 { font-size: 1.5rem; font-weight: 800; }
         h1 span { color: #3ecf6a; }
-        .tagline { color: #888899; font-size: 0.85rem; margin-bottom: 32px; }
+        .tagline { color: #888899; font-size: 0.85rem; margin-bottom: 8px; }
+        .trained-tag { color: #888899; font-size: 0.75rem; }
+        .trained-tag span { color: #aaa; }
         .dataset-btn { display: inline-block; padding: 8px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #888899; text-decoration: none; font-size: 0.8rem; transition: all 0.2s; }
         .dataset-btn:hover { background: rgba(255,255,255,0.1); color: #f0f0f5; }
         .card { background: #111118; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 24px; margin-bottom: 20px; overflow-x: auto; }
@@ -177,11 +191,8 @@ HTML = '''
         .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; }
         .badge.win { background: rgba(62,207,106,0.15); color: #3ecf6a; }
         .badge.loss { background: rgba(239,68,68,0.15); color: #ef4444; }
-        .correct { color: #3ecf6a; }
-        .incorrect { color: #ef4444; }
         .correct-row td { background: rgba(62,207,106,0.08); }
         .incorrect-row td { background: rgba(239,68,68,0.08); }
-        .section { margin-top: 24px; }
         .features { display: flex; flex-wrap: wrap; gap: 8px; }
         .feature-tag { padding: 4px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; font-size: 0.8rem; color: #888899; }
         .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 16px; }
@@ -201,6 +212,7 @@ HTML = '''
             <div>
                 <h1>🏀 NBA <span>Win Predictor</span></h1>
                 <p class="tagline">Logistic Regression on Team Statistics</p>
+                <p class="trained-tag">Trained <span>{{ trained_at }}</span> &nbsp;·&nbsp; {{ total_games|default(0)|int|commatize }} total games</p>
             </div>
             <a class="dataset-btn" href="https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores?select=TeamStatistics.csv" target="_blank">📂 View Dataset</a>
         </div>
@@ -209,19 +221,19 @@ HTML = '''
             <div class="section-title">📊 Model Performance</div>
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-value">{{ "%.1f"|format(test_acc * 100) }}%</div>
+                    <div class="stat-value">{{ "%.1f"|format((test_accuracy or 0) * 100) }}%</div>
                     <div class="stat-label">Test Accuracy</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">{{ train_games }}</div>
+                    <div class="stat-value">{{ (train_games or 0)|int|commatize }}</div>
                     <div class="stat-label">Training Games</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">{{ test_games }}</div>
+                    <div class="stat-value">{{ (test_games or 0)|int|commatize }}</div>
                     <div class="stat-label">Testing Games</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">{{ total_games }}</div>
+                    <div class="stat-value">{{ (total_games or 0)|int|commatize }}</div>
                     <div class="stat-label">Total Games</div>
                 </div>
             </div>
@@ -230,7 +242,7 @@ HTML = '''
         <div class="card">
             <div class="section-title">🔧 Feature Columns</div>
             <div class="features">
-                {% for f in featCols %}
+                {% for f in feat_cols %}
                 <span class="feature-tag">{{ f }}</span>
                 {% endfor %}
             </div>
@@ -242,7 +254,6 @@ HTML = '''
                 <span><strong>P</strong> = Predicted Result</span>
                 <span><strong>A</strong> = Actual Result</span>
                 <span><strong>H/A</strong> = Home/Away</span>
-                <span><strong>A</strong> = Assists</span>
                 <span><strong>R</strong> = Rebounds</span>
                 <span><strong>B</strong> = Blocks</span>
                 <span><strong>S</strong> = Steals</span>
@@ -260,7 +271,7 @@ HTML = '''
                         <th>Team</th>
                         <th>Opp</th>
                         <th>H/A</th>
-                        {% for f in displayLabels %}
+                        {% for f in display_labels %}
                         <th>{{ f }}</th>
                         {% endfor %}
                         <th>P</th>
@@ -269,12 +280,12 @@ HTML = '''
                 </thead>
                 <tbody>
                     {% for _, row in page_items.iterrows() %}
-                    <tr class="{{ 'correct-row' if row.get('correct') else 'incorrect-row' }}">
-                        <td>{{ row.get('gameDate', 'N/A')[:10] if row.get('gameDate') else 'N/A' }}</td>
+                    <tr class="{{ 'correct-row' if row.get('correct', False) else 'incorrect-row' }}">
+                        <td>{{ (row.get('gameDate', 'N/A') | to_str)[:10] }}</td>
                         <td>{{ row.get('teamName', 'N/A') }}</td>
                         <td>{{ row.get('opponentTeamName', 'N/A') }}</td>
                         <td><span class="badge">{{ 'Home' if row.get('home') == 1 else 'Away' }}</span></td>
-                        {% for f in displayCols %}
+                        {% for f in display_cols %}
                         <td>{{ "{:.0f}".format(row.get(f, 0)) }}</td>
                         {% endfor %}
                         <td><span class="badge {{ 'win' if row.get('pred') == 1 else 'loss' }}">{{ 'W' if row.get('pred') == 1 else 'L' }}</span></td>
@@ -312,7 +323,7 @@ def index():
     page = request.args.get('page', 1, type=int)
     total_pages = max(1, (len(predictions_df) + PER_PAGE - 1) // PER_PAGE)
     start = (page - 1) * PER_PAGE
-    end = start + PER_PAGE
+    end   = start + PER_PAGE
     page_items = predictions_df.iloc[start:end]
     rendered = render_template_string(
         HTML,
