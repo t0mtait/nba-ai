@@ -1,3 +1,10 @@
+## [2.1.6](https://github.com/t0mtait/nba-ai/compare/v2.1.5...v2.1.6) (2026-11-03)
+
+
+### Bug Fixes
+
+* dupe match fix. no more entry-per-pov ([5c756ca](https://github.com/t0mtait/nba-ai/commit/5c756caba7c1364db43cebedc0d18154c333fa20))
+
 ## [2.1.5](https://github.com/t0mtait/nba-ai/compare/v2.1.4...v2.1.5) (2026-10-30)
 
 
