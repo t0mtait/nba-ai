@@ -51,6 +51,7 @@ def load_data():
     return df
 
 def prepare_features(df):
+    df = df[df["home"] == 1]
     all_game_dates = df["gameDate"].astype(str)
     all_opponent   = df["opponentTeamName"]
     all_team       = df["teamName"]
