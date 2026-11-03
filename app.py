@@ -70,6 +70,7 @@ def refresh_data(force_download: bool = True) -> None:
         _cleanup_old_cache_versions(csv_path)
 
         df = pd.read_csv(csv_path, low_memory=False)
+        df = df[df['home'] == 1]
         # Preserve columns before dropna for display
         date_col = 'gameDate' if 'gameDate' in df.columns else 'gameDateTimeEst'
         all_game_dates = df[date_col].astype(str)
