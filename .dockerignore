@@ -1,0 +1,13 @@
+# The image only needs app.py, requirements.txt and models/.
+# Without this, the build context ships node_modules/ (68M) and .git/ (62M).
+node_modules/
+.git/
+.github/
+__pycache__/
+*.pyc
+.DS_Store
+package.json
+package-lock.json
+release.config.js
+cron.log
+train_models.py
