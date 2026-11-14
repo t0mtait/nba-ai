@@ -1,3 +1,10 @@
+# [2.2.0](https://github.com/t0mtait/nba-ai/compare/v2.1.6...v2.2.0) (2026-11-14)
+
+
+### Features
+
+* redesign UI with modern typography, animations, and interactive win simulator ([73cbcaa](https://github.com/t0mtait/nba-ai/commit/73cbcaacfaa281733298bc89432f39f0ed74f965))
+
 ## [2.1.6](https://github.com/t0mtait/nba-ai/compare/v2.1.5...v2.1.6) (2026-11-03)
 
 
