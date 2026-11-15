@@ -12,7 +12,9 @@ import os
 import subprocess
 import sys
 import traceback
-from datetime import datetime
+import urllib.request
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import kagglehub
 import pandas as pd
@@ -26,6 +28,44 @@ from sklearn.preprocessing import StandardScaler
 REPO_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(REPO_DIR, "models")
 os.makedirs(MODEL_DIR, exist_ok=True)
+
+DATASET_HANDLE = "eoinamoore/historical-nba-data-and-player-box-scores"
+DATASET_FILE = "TeamStatistics.csv"
+ESPN_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={ymd}"
+ESPN_SUMMARY_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event={event_id}"
+
+NBA_TEAM_IDS = {
+    "Hawks": 1610612737,
+    "Celtics": 1610612738,
+    "Cavaliers": 1610612739,
+    "Pelicans": 1610612740,
+    "Bulls": 1610612741,
+    "Mavericks": 1610612742,
+    "Nuggets": 1610612743,
+    "Warriors": 1610612744,
+    "Rockets": 1610612745,
+    "Clippers": 1610612746,
+    "Lakers": 1610612747,
+    "Heat": 1610612748,
+    "Bucks": 1610612749,
+    "Timberwolves": 1610612750,
+    "Nets": 1610612751,
+    "Knicks": 1610612752,
+    "Magic": 1610612753,
+    "Pacers": 1610612754,
+    "76ers": 1610612755,
+    "Suns": 1610612756,
+    "Trail Blazers": 1610612757,
+    "Kings": 1610612758,
+    "Spurs": 1610612759,
+    "Thunder": 1610612760,
+    "Raptors": 1610612761,
+    "Jazz": 1610612762,
+    "Grizzlies": 1610612763,
+    "Wizards": 1610612764,
+    "Pistons": 1610612765,
+    "Hornets": 1610612766,
+}
 
 # ── features ─────────────────────────────────────────────────────────────────
 FEAT_COLS = [
@@ -43,10 +83,149 @@ DISPLAY_LABELS = ["A", "R", "B", "S", "TO", "F", "Q1", "Q2", "FGA", "3FA", "FTA"
 
 # ── training ─────────────────────────────────────────────────────────────────
 
+def _parse_made_attempted(val: str) -> float:
+    parts = str(val).split("-")
+    return float(parts[1]) if len(parts) == 2 else float(parts[0])
+
+
+def _append_recent_espn_games(df: pd.DataFrame, date_col: str = "gameDate") -> pd.DataFrame:
+    try:
+        team_map = dict(NBA_TEAM_IDS)
+        if "teamName" in df.columns and "teamId" in df.columns:
+            from_df = (
+                df[["teamName", "teamId"]]
+                .dropna()
+                .drop_duplicates(subset=["teamName"], keep="first")
+                .set_index("teamName")["teamId"]
+                .to_dict()
+            )
+            team_map.update(from_df)
+
+        home_df = df[df["home"] == 1]
+        existing_keys = set(
+            zip(
+                home_df[date_col].astype(str).str[:10],
+                home_df["teamName"].astype(str),
+                home_df["opponentTeamName"].astype(str),
+            )
+        )
+
+        max_date_str = home_df[date_col].dropna().astype(str).str[:10].max()
+        ny_tz = ZoneInfo("America/New_York")
+        today_est = datetime.now(ny_tz).date()
+        start_date = (
+            datetime.strptime(max_date_str, "%Y-%m-%d").date()
+            if isinstance(max_date_str, str) and len(max_date_str) == 10
+            else today_est - timedelta(days=7)
+        )
+        if (today_est - start_date).days > 14:
+            start_date = today_est - timedelta(days=14)
+
+        new_rows = []
+        cur = start_date
+        headers = {"User-Agent": "Mozilla/5.0"}
+        while cur <= today_est:
+            ymd = cur.strftime("%Y%m%d")
+            cur += timedelta(days=1)
+            try:
+                req = urllib.request.Request(ESPN_SCOREBOARD_URL.format(ymd=ymd), headers=headers)
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    events = json.loads(resp.read().decode()).get("events", [])
+            except Exception as exc:
+                print(f"[{timestamp()}] Warning: ESPN scoreboard fetch failed for {ymd}: {exc}")
+                continue
+
+            for ev in events:
+                try:
+                    if not ev.get("status", {}).get("type", {}).get("completed"):
+                        continue
+                    comp = (ev.get("competitions") or [{}])[0]
+                    competitors = comp.get("competitors", [])
+                    home_c = next((c for c in competitors if c.get("homeAway") == "home"), None)
+                    away_c = next((c for c in competitors if c.get("homeAway") == "away"), None)
+                    if not home_c or not away_c:
+                        continue
+
+                    tname = home_c.get("team", {}).get("name")
+                    oname = away_c.get("team", {}).get("name")
+                    if not tname or not oname or tname not in team_map:
+                        continue
+
+                    dt_utc = datetime.fromisoformat(ev["date"].replace("Z", "+00:00"))
+                    dt_est = dt_utc.astimezone(ny_tz)
+                    gdate_full = dt_est.strftime("%Y-%m-%d %H:%M:%S")
+                    gdate_short = gdate_full[:10]
+
+                    if (gdate_short, tname, oname) in existing_keys:
+                        continue
+
+                    s_req = urllib.request.Request(ESPN_SUMMARY_URL.format(event_id=ev["id"]), headers=headers)
+                    with urllib.request.urlopen(s_req, timeout=10) as s_resp:
+                        s_data = json.loads(s_resp.read().decode())
+
+                    b_teams = s_data.get("boxscore", {}).get("teams", [])
+                    b_home = next((t for t in b_teams if t.get("team", {}).get("name") == tname), None)
+                    if not b_home:
+                        continue
+
+                    stats = {s["name"]: s["displayValue"] for s in b_home.get("statistics", []) if "name" in s and "displayValue" in s}
+                    linescores = home_c.get("linescores", [])
+                    if len(linescores) < 2:
+                        s_comp = (s_data.get("header", {}).get("competitions") or [{}])[0]
+                        s_home = next((c for c in s_comp.get("competitors", []) if c.get("homeAway") == "home"), {})
+                        linescores = s_home.get("linescores", [])
+                    if len(linescores) < 2:
+                        continue
+
+                    q1 = float(linescores[0].get("displayValue", linescores[0].get("value", 0)))
+                    q2 = float(linescores[1].get("displayValue", linescores[1].get("value", 0)))
+                    fga = _parse_made_attempted(stats["fieldGoalsMade-fieldGoalsAttempted"])
+                    tpa = _parse_made_attempted(stats["threePointFieldGoalsMade-threePointFieldGoalsAttempted"])
+                    fta = _parse_made_attempted(stats["freeThrowsMade-freeThrowsAttempted"])
+
+                    new_rows.append({
+                        date_col: gdate_full,
+                        "gameDate": gdate_full,
+                        "gameDateTimeEst": gdate_full,
+                        "teamId": team_map[tname],
+                        "teamName": tname,
+                        "opponentTeamName": oname,
+                        "home": 1,
+                        "win": 1.0 if home_c.get("winner") else 0.0,
+                        "assists": float(stats["assists"]),
+                        "reboundsTotal": float(stats["totalRebounds"]),
+                        "blocks": float(stats["blocks"]),
+                        "steals": float(stats["steals"]),
+                        "turnovers": float(stats.get("turnovers", stats.get("totalTurnovers", 0))),
+                        "foulsPersonal": float(stats.get("fouls", stats.get("foulsPersonal", 0))),
+                        "q1Points": q1,
+                        "q2Points": q2,
+                        "fieldGoalsAttempted": fga,
+                        "threePointersAttempted": tpa,
+                        "freeThrowsAttempted": fta,
+                    })
+                    existing_keys.add((gdate_short, tname, oname))
+                except Exception as exc:
+                    print(f"[{timestamp()}] Warning: Failed to parse ESPN event {ev.get('id')}: {exc}")
+
+        if new_rows:
+            new_rows.sort(key=lambda r: r[date_col], reverse=True)
+            df = pd.concat([pd.DataFrame(new_rows), df], ignore_index=True)
+            print(f"[{timestamp()}] Supplemented with {len(new_rows)} recent ESPN NBA game(s)")
+    except Exception as exc:
+        print(f"[{timestamp()}] Warning: Failed to append recent ESPN games: {exc}")
+    return df
+
+
 def load_data():
     print(f"[{timestamp()}] Downloading dataset...")
-    path = kagglehub.dataset_download("eoinamoore/historical-nba-data-and-player-box-scores")
-    df = pd.read_csv(f"{path}/TeamStatistics.csv")
+    try:
+        path = kagglehub.dataset_download(DATASET_HANDLE, path=DATASET_FILE, force_download=True)
+    except Exception:
+        path = kagglehub.dataset_download(DATASET_HANDLE, path=DATASET_FILE, force_download=False)
+    csv_path = os.path.join(path, DATASET_FILE) if os.path.isdir(path) else path
+    df = pd.read_csv(csv_path, low_memory=False)
+    df = _append_recent_espn_games(df)
     print(f"[{timestamp()}] Loaded {len(df):,} rows, date range: {df['gameDate'].min()} → {df['gameDate'].max()}")
     return df
 
