@@ -1,3 +1,10 @@
+## [2.2.1](https://github.com/t0mtait/nba-ai/compare/v2.2.0...v2.2.1) (2026-11-15)
+
+
+### Bug Fixes
+
+* supplement Kaggle dataset with live ESPN NBA completed games ([0b3b331](https://github.com/t0mtait/nba-ai/commit/0b3b331fb328f6d9f5582909968d53a50d4188ef))
+
 # [2.2.0](https://github.com/t0mtait/nba-ai/compare/v2.1.6...v2.2.0) (2026-11-14)
 
 
