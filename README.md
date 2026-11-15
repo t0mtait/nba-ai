@@ -21,11 +21,11 @@ dataset, trains the model, and then serves requests.
 
 | | |
 |---|---|
-| Dataset | [`eoinamoore/historical-nba-data-and-player-box-scores`](https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores) — `TeamStatistics.csv` (~34 MB) |
+| Dataset | [`eoinamoore/historical-nba-data-and-player-box-scores`](https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores) — `TeamStatistics.csv` (~34 MB), supplemented with recent completed games from the ESPN NBA scoreboard/boxscore API |
 | Model | `StandardScaler` → `LogisticRegression` (sklearn `Pipeline`) |
 | Features | `teamId`, `home`, `assists`, `reboundsTotal`, `blocks`, `steals`, `turnovers`, `foulsPersonal`, `q1Points`, `q2Points`, `fieldGoalsAttempted`, `threePointersAttempted`, `freeThrowsAttempted` |
 | Split | 90/10 train/test, `random_state=42` |
-| Refresh | Dataset re-downloaded and model retrained every `REFRESH_INTERVAL_SECONDS` (default `3600`), on a background thread, and lazily on request if the TTL has expired |
+| Refresh | Dataset re-downloaded, supplemented with any newer completed NBA games from ESPN, and model retrained every `REFRESH_INTERVAL_SECONDS` (default `3600`), on a background thread, and lazily on request if the TTL has expired |
 
 Accuracy and corpus size vary with the upstream dataset; the numbers below
 are what the deployed instance reported on its last boot.
