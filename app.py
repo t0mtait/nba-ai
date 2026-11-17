@@ -1611,7 +1611,6 @@ HTML = '''
             <div class="legend">
                 <span><strong>P</strong> = Predicted Result</span>
                 <span><strong>A</strong> = Actual Result</span>
-                <span><strong>H/A</strong> = Home/Away</span>
                 <span><strong>A</strong> = Assists</span>
                 <span><strong>R</strong> = Rebounds</span>
                 <span><strong>B</strong> = Blocks</span>
@@ -1629,11 +1628,10 @@ HTML = '''
                     <thead>
                         <tr>
                             <th onclick="sortTable(0, 'str')" title="Game Date">Date ⇅</th>
-                            <th onclick="sortTable(1, 'str')" title="Team Name">Team ⇅</th>
-                            <th onclick="sortTable(2, 'str')" title="Opponent Team">Opp ⇅</th>
-                            <th data-col="home" title="Home or Away">H/A</th>
+                            <th onclick="sortTable(1, 'str')" title="Home Team">Home ⇅</th>
+                            <th onclick="sortTable(2, 'str')" title="Away Team">Away ⇅</th>
                             {% for f in display_labels %}
-                            <th data-col="{{ display_cols[loop.index0] }}" onclick="sortTable({{ loop.index0 + 4 }}, 'num')" title="{{ display_cols[loop.index0] }}">{{ f }}</th>
+                            <th data-col="{{ display_cols[loop.index0] }}" onclick="sortTable({{ loop.index0 + 3 }}, 'num')" title="{{ display_cols[loop.index0] }}">{{ f }}</th>
                             {% endfor %}
                             <th title="Predicted Outcome">P</th>
                             <th title="Actual Outcome">A</th>
@@ -1654,7 +1652,6 @@ HTML = '''
                             <td class="date-cell">{{ (row.get('gameDate', 'N/A') | to_str)[:10] }}</td>
                             <td class="team-cell">{{ row.get('teamName', 'N/A') }}</td>
                             <td class="opp-cell">{{ row.get('opponentTeamName', 'N/A') }}</td>
-                            <td data-col="home"><span class="badge home-badge">{{ 'Home' if row.get('home') == 1 else 'Away' }}</span></td>
                             {% for f in display_cols %}
                             <td data-col="{{ f }}">{{ "{:.0f}".format(row.get(f, 0)) }}</td>
                             {% endfor %}
@@ -1902,7 +1899,7 @@ HTML = '''
             const detailTr = document.createElement('tr');
             detailTr.className = 'detail-row open';
             detailTr.innerHTML = `
-                <td colspan="17">
+                <td colspan="16">
                     <div class="detail-grid">
                         <div style="min-width: 190px;">
                             <div style="font-weight: 700; font-size: 0.92rem; color: var(--text-primary);">${team} vs ${opp}</div>
