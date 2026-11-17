@@ -1,3 +1,10 @@
+# [2.3.0](https://github.com/t0mtait/nba-ai/compare/v2.2.1...v2.3.0) (2026-11-17)
+
+
+### Features
+
+* rename table columns to Home and Away and drop H/A column ([316ff59](https://github.com/t0mtait/nba-ai/commit/316ff5971ac63a49d4560ace6b98acbab1eed4ef))
+
 ## [2.2.1](https://github.com/t0mtait/nba-ai/compare/v2.2.0...v2.2.1) (2026-11-15)
 
 
