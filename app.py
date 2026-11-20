@@ -58,14 +58,12 @@ NBA_TEAM_IDS = {
 }
 
 featCols = ['teamId', 'home', 'assists', 'reboundsTotal', 'blocks', 'steals',
-            'turnovers', 'foulsPersonal', 'q1Points', 'q2Points',
-            'fieldGoalsAttempted', 'threePointersAttempted', 'freeThrowsAttempted']
+            'turnovers', 'foulsPersonal', 'fieldGoalsPercentage', 'freeThrowsAttempted']
 # Columns to display in table (excludes teamId and home, shown separately)
 displayCols = ['assists', 'reboundsTotal', 'blocks', 'steals', 'turnovers',
-               'foulsPersonal', 'q1Points', 'q2Points',
-               'fieldGoalsAttempted', 'threePointersAttempted', 'freeThrowsAttempted']
+               'foulsPersonal', 'fieldGoalsPercentage', 'freeThrowsAttempted']
 # Display labels for table headers (matches displayCols order)
-displayLabels = ['A', 'R', 'B', 'S', 'TO', 'F', 'Q1', 'Q2', 'FGA', '3FA', 'FTA']
+displayLabels = ['A', 'R', 'B', 'S', 'TO', 'F', 'FG%', 'FTA']
 
 _refresh_lock = threading.Lock()
 _state = {
@@ -100,6 +98,14 @@ def _parse_made_attempted(val: str) -> float:
     """Extract attempted count from ESPN 'made-attempted' strings (e.g. '40-88' -> 88.0)."""
     parts = str(val).split("-")
     return float(parts[1]) if len(parts) == 2 else float(parts[0])
+
+
+def _parse_pct(val: str) -> float:
+    """Extract percentage from ESPN 'made-attempted' string (e.g. '33-80' -> 0.413)."""
+    parts = str(val).split("-")
+    if len(parts) == 2 and float(parts[1]) > 0:
+        return round(float(parts[0]) / float(parts[1]), 3)
+    return 0.0
 
 
 def _append_recent_espn_games(df: pd.DataFrame, date_col: str) -> pd.DataFrame:
@@ -184,19 +190,8 @@ def _append_recent_espn_games(df: pd.DataFrame, date_col: str) -> pd.DataFrame:
                         continue
 
                     stats = {s["name"]: s["displayValue"] for s in b_home.get("statistics", []) if "name" in s and "displayValue" in s}
-                    linescores = home_c.get("linescores", [])
-                    if len(linescores) < 2:
-                        s_comp = (s_data.get("header", {}).get("competitions") or [{}])[0]
-                        s_home = next((c for c in s_comp.get("competitors", []) if c.get("homeAway") == "home"), {})
-                        linescores = s_home.get("linescores", [])
-                    if len(linescores) < 2:
-                        continue
-
-                    q1 = float(linescores[0].get("displayValue", linescores[0].get("value", 0)))
-                    q2 = float(linescores[1].get("displayValue", linescores[1].get("value", 0)))
-                    fga = _parse_made_attempted(stats["fieldGoalsMade-fieldGoalsAttempted"])
-                    tpa = _parse_made_attempted(stats["threePointFieldGoalsMade-threePointFieldGoalsAttempted"])
-                    fta = _parse_made_attempted(stats["freeThrowsMade-freeThrowsAttempted"])
+                    fg_pct = _parse_pct(stats.get("fieldGoalsMade-fieldGoalsAttempted", ""))
+                    fta = _parse_made_attempted(stats.get("freeThrowsMade-freeThrowsAttempted", "0-0"))
 
                     new_rows.append({
                         date_col: gdate_full,
@@ -207,16 +202,13 @@ def _append_recent_espn_games(df: pd.DataFrame, date_col: str) -> pd.DataFrame:
                         "opponentTeamName": oname,
                         "home": 1,
                         "win": 1.0 if home_c.get("winner") else 0.0,
-                        "assists": float(stats["assists"]),
-                        "reboundsTotal": float(stats["totalRebounds"]),
-                        "blocks": float(stats["blocks"]),
-                        "steals": float(stats["steals"]),
+                        "assists": float(stats.get("assists", 0)),
+                        "reboundsTotal": float(stats.get("totalRebounds", 0)),
+                        "blocks": float(stats.get("blocks", 0)),
+                        "steals": float(stats.get("steals", 0)),
                         "turnovers": float(stats.get("turnovers", stats.get("totalTurnovers", 0))),
                         "foulsPersonal": float(stats.get("fouls", stats.get("foulsPersonal", 0))),
-                        "q1Points": q1,
-                        "q2Points": q2,
-                        "fieldGoalsAttempted": fga,
-                        "threePointersAttempted": tpa,
+                        "fieldGoalsPercentage": fg_pct,
                         "freeThrowsAttempted": fta,
                     })
                     existing_keys.add((gdate_short, tname, oname))
@@ -1471,20 +1463,8 @@ HTML = '''
                         <input type="range" class="sim-slider" id="sim_foulsPersonal" min="8" max="36" value="20" oninput="updateSimulator()">
                     </div>
                     <div class="sim-control">
-                        <div class="sim-control-header"><span class="sim-control-label">Q1 Points (Q1)</span><span class="sim-control-val" id="val_q1Points">28</span></div>
-                        <input type="range" class="sim-slider" id="sim_q1Points" min="10" max="48" value="28" oninput="updateSimulator()">
-                    </div>
-                    <div class="sim-control">
-                        <div class="sim-control-header"><span class="sim-control-label">Q2 Points (Q2)</span><span class="sim-control-val" id="val_q2Points">28</span></div>
-                        <input type="range" class="sim-slider" id="sim_q2Points" min="10" max="48" value="28" oninput="updateSimulator()">
-                    </div>
-                    <div class="sim-control">
-                        <div class="sim-control-header"><span class="sim-control-label">FG Attempted (FGA)</span><span class="sim-control-val" id="val_fieldGoalsAttempted">88</span></div>
-                        <input type="range" class="sim-slider" id="sim_fieldGoalsAttempted" min="60" max="115" value="88" oninput="updateSimulator()">
-                    </div>
-                    <div class="sim-control">
-                        <div class="sim-control-header"><span class="sim-control-label">3PT Attempted (3FA)</span><span class="sim-control-val" id="val_threePointersAttempted">34</span></div>
-                        <input type="range" class="sim-slider" id="sim_threePointersAttempted" min="10" max="60" value="34" oninput="updateSimulator()">
+                        <div class="sim-control-header"><span class="sim-control-label">Field Goal % (FG%)</span><span class="sim-control-val" id="val_fieldGoalsPercentage">46%</span></div>
+                        <input type="range" class="sim-slider" id="sim_fieldGoalsPercentage" min="30" max="65" step="0.5" value="46" oninput="updateSimulator()">
                     </div>
                     <div class="sim-control">
                         <div class="sim-control-header"><span class="sim-control-label">FT Attempted (FTA)</span><span class="sim-control-val" id="val_freeThrowsAttempted">23</span></div>
@@ -1617,9 +1597,7 @@ HTML = '''
                 <span><strong>S</strong> = Steals</span>
                 <span><strong>TO</strong> = Turnovers</span>
                 <span><strong>F</strong> = Fouls</span>
-                <span><strong>Q1/Q2</strong> = Quarter Points</span>
-                <span><strong>FGA</strong> = Field Goals Attempted</span>
-                <span><strong>3FA</strong> = 3-Pointers Attempted</span>
+                <span><strong>FG%</strong> = Field Goal Percentage</span>
                 <span><strong>FTA</strong> = Free Throws Attempted</span>
             </div>
 
@@ -1646,14 +1624,24 @@ HTML = '''
                             data-opp="{{ row.get('opponentTeamName', 'N/A') }}"
                             data-date="{{ (row.get('gameDate', 'N/A') | to_str)[:10] }}"
                             {% for f in display_cols %}
+                            {% if f == 'fieldGoalsPercentage' %}
+                            data-stat-{{ f }}="{{ '%.1f'|format(row.get(f, 0) * 100 if row.get(f, 0) <= 1 else row.get(f, 0)) }}"
+                            {% else %}
                             data-stat-{{ f }}="{{ '{:.0f}'.format(row.get(f, 0)) }}"
+                            {% endif %}
                             {% endfor %}
                             onclick="toggleRowDetail(this)">
                             <td class="date-cell">{{ (row.get('gameDate', 'N/A') | to_str)[:10] }}</td>
                             <td class="team-cell">{{ row.get('teamName', 'N/A') }}</td>
                             <td class="opp-cell">{{ row.get('opponentTeamName', 'N/A') }}</td>
                             {% for f in display_cols %}
-                            <td data-col="{{ f }}">{{ "{:.0f}".format(row.get(f, 0)) }}</td>
+                            <td data-col="{{ f }}">
+                                {% if f == 'fieldGoalsPercentage' %}
+                                {{ "%.1f%%"|format(row.get(f, 0) * 100 if row.get(f, 0) <= 1 else row.get(f, 0)) }}
+                                {% else %}
+                                {{ "{:.0f}".format(row.get(f, 0)) }}
+                                {% endif %}
+                            </td>
                             {% endfor %}
                             <td><span class="badge {{ 'win' if row.get('pred') == 1 else 'loss' }}">{{ 'W' if row.get('pred') == 1 else 'L' }}</span></td>
                             <td><span class="badge {{ 'win' if row.get('actual') == 1 else 'loss' }}">{{ 'W' if row.get('actual') == 1 else 'L' }}</span></td>
@@ -1694,10 +1682,7 @@ HTML = '''
             steals: { cat: 'defense', label: 'Steals (S)', desc: 'Live-ball defensive takeaways that fuel transition scoring opportunities.' },
             turnovers: { cat: 'discipline', label: 'Turnovers (TO)', desc: 'Possessions lost without a shot attempt — negatively impacts win probability.' },
             foulsPersonal: { cat: 'discipline', label: 'Personal Fouls (F)', desc: 'Total team fouls committed — excess fouling gifts opponents free-throw points.' },
-            q1Points: { cat: 'offense', label: '1st Quarter Points (Q1)', desc: 'Opening quarter scoring output establishing early game margin.' },
-            q2Points: { cat: 'offense', label: '2nd Quarter Points (Q2)', desc: 'Second quarter scoring pace leading into halftime.' },
-            fieldGoalsAttempted: { cat: 'shooting', label: 'Field Goals Attempted (FGA)', desc: 'Total shot volume from the floor — higher FGA without high efficiency often signals trailing pace.' },
-            threePointersAttempted: { cat: 'shooting', label: '3-Pointers Attempted (3FA)', desc: 'Perimeter shot volume reflecting modern spacing and pace.' },
+            fieldGoalsPercentage: { cat: 'shooting', label: 'Field Goal % (FG%)', desc: 'Overall shooting efficiency from the field — higher conversion rate is a primary driver of scoring margin.' },
             freeThrowsAttempted: { cat: 'shooting', label: 'Free Throws Attempted (FTA)', desc: 'Trips to the foul line generated by paint pressure and bonus situations.' }
         };
 
@@ -1743,10 +1728,10 @@ HTML = '''
         }
 
         const PRESETS = {
-            elite: { assists: 32, reboundsTotal: 48, blocks: 6, steals: 10, turnovers: 10, foulsPersonal: 18, q1Points: 34, q2Points: 33, fieldGoalsAttempted: 86, threePointersAttempted: 38, freeThrowsAttempted: 26 },
-            defense: { assists: 24, reboundsTotal: 52, blocks: 9, steals: 12, turnovers: 11, foulsPersonal: 19, q1Points: 26, q2Points: 27, fieldGoalsAttempted: 84, threePointersAttempted: 30, freeThrowsAttempted: 25 },
-            average: { assists: 25, reboundsTotal: 44, blocks: 5, steals: 8, turnovers: 14, foulsPersonal: 20, q1Points: 27, q2Points: 27, fieldGoalsAttempted: 88, threePointersAttempted: 34, freeThrowsAttempted: 22 },
-            cold: { assists: 17, reboundsTotal: 38, blocks: 3, steals: 5, turnovers: 18, foulsPersonal: 24, q1Points: 20, q2Points: 21, fieldGoalsAttempted: 92, threePointersAttempted: 40, freeThrowsAttempted: 16 }
+            elite: { assists: 32, reboundsTotal: 48, blocks: 6, steals: 10, turnovers: 10, foulsPersonal: 18, fieldGoalsPercentage: 54, freeThrowsAttempted: 26 },
+            defense: { assists: 24, reboundsTotal: 52, blocks: 9, steals: 12, turnovers: 11, foulsPersonal: 19, fieldGoalsPercentage: 46, freeThrowsAttempted: 25 },
+            average: { assists: 25, reboundsTotal: 44, blocks: 5, steals: 8, turnovers: 14, foulsPersonal: 20, fieldGoalsPercentage: 45.5, freeThrowsAttempted: 22 },
+            cold: { assists: 17, reboundsTotal: 38, blocks: 3, steals: 5, turnovers: 18, foulsPersonal: 24, fieldGoalsPercentage: 38, freeThrowsAttempted: 16 }
         };
 
         function applyPreset(name, customLabel) {
@@ -1760,27 +1745,29 @@ HTML = '''
         }
 
         async function updateSimulator(customCaption) {
-            const fields = ['assists', 'reboundsTotal', 'blocks', 'steals', 'turnovers', 'foulsPersonal', 'q1Points', 'q2Points', 'fieldGoalsAttempted', 'threePointersAttempted', 'freeThrowsAttempted'];
+            const fields = ['assists', 'reboundsTotal', 'blocks', 'steals', 'turnovers', 'foulsPersonal', 'fieldGoalsPercentage', 'freeThrowsAttempted'];
             const payload = {};
             fields.forEach(f => {
                 const val = parseFloat(document.getElementById('sim_' + f).value);
-                document.getElementById('val_' + f).textContent = val;
-                payload[f] = val;
+                if (f === 'fieldGoalsPercentage') {
+                    document.getElementById('val_' + f).textContent = val + '%';
+                    payload[f] = val > 1 ? val / 100 : val;
+                } else {
+                    document.getElementById('val_' + f).textContent = val;
+                    payload[f] = val;
+                }
             });
 
             // Instant client-side logistic estimate + server refinement if available
-            let z = 0.25
-                + (payload.assists - 24.5) * 0.095
-                + (payload.reboundsTotal - 43.5) * 0.085
-                + (payload.blocks - 4.8) * 0.08
-                + (payload.steals - 7.6) * 0.11
-                - (payload.turnovers - 13.8) * 0.12
-                - (payload.foulsPersonal - 20.5) * 0.045
-                + (payload.q1Points - 26.5) * 0.075
-                + (payload.q2Points - 26.5) * 0.075
-                - (payload.fieldGoalsAttempted - 87.0) * 0.065
-                - (payload.threePointersAttempted - 33.0) * 0.015
-                + (payload.freeThrowsAttempted - 22.5) * 0.035;
+            let z = 0.51
+                + (payload.assists - 18.33) * 0.0302
+                - (payload.reboundsTotal - 33.41) * 0.0115
+                + (payload.blocks - 3.83) * 0.0855
+                + (payload.steals - 5.75) * 0.0596
+                - (payload.turnovers - 10.59) * 0.1101
+                - (payload.foulsPersonal - 21.66) * 0.0326
+                + (payload.fieldGoalsPercentage - 0.358) * 1.2804
+                + (payload.freeThrowsAttempted - 26.02) * 0.0300;
             let prob = 1 / (1 + Math.exp(-z));
 
             try {
@@ -1882,16 +1869,18 @@ HTML = '''
             const team = row.getAttribute('data-team');
             const opp = row.getAttribute('data-opp');
             const date = row.getAttribute('data-date');
-            const stats = ['assists', 'reboundsTotal', 'blocks', 'steals', 'turnovers', 'foulsPersonal', 'q1Points', 'q2Points', 'fieldGoalsAttempted', 'threePointersAttempted', 'freeThrowsAttempted'];
-            const maxes = { assists: 40, reboundsTotal: 65, blocks: 14, steals: 16, turnovers: 25, foulsPersonal: 32, q1Points: 45, q2Points: 45, fieldGoalsAttempted: 108, threePointersAttempted: 55, freeThrowsAttempted: 42 };
+            const stats = ['assists', 'reboundsTotal', 'blocks', 'steals', 'turnovers', 'foulsPersonal', 'fieldGoalsPercentage', 'freeThrowsAttempted'];
+            const maxes = { assists: 40, reboundsTotal: 65, blocks: 14, steals: 16, turnovers: 25, foulsPersonal: 32, fieldGoalsPercentage: 70, freeThrowsAttempted: 42 };
 
             let barsHtml = '';
             stats.forEach(s => {
                 const v = parseFloat(row.getAttribute('data-stat-' + s) || '0');
+                const displayVal = s === 'fieldGoalsPercentage' ? v.toFixed(1) + '%' : v;
+                const label = s === 'fieldGoalsPercentage' ? 'FG%' : s;
                 const pct = Math.min(100, Math.round((v / (maxes[s] || 50)) * 100));
                 barsHtml += `
                     <div class="mini-stat">
-                        <div class="mini-stat-top"><span>${s}</span><strong>${v}</strong></div>
+                        <div class="mini-stat-top"><span>${label}</span><strong>${displayVal}</strong></div>
                         <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${pct}%; background: linear-gradient(90deg, var(--accent-cyan), var(--accent-emerald));"></div></div>
                     </div>`;
             });
@@ -1899,7 +1888,7 @@ HTML = '''
             const detailTr = document.createElement('tr');
             detailTr.className = 'detail-row open';
             detailTr.innerHTML = `
-                <td colspan="16">
+                <td colspan="13">
                     <div class="detail-grid">
                         <div style="min-width: 190px;">
                             <div style="font-weight: 700; font-size: 0.92rem; color: var(--text-primary);">${team} vs ${opp}</div>
@@ -1920,7 +1909,7 @@ HTML = '''
             const gameRow = detailRow ? detailRow.previousElementSibling : null;
             if (!gameRow) return;
 
-            const stats = ['assists', 'reboundsTotal', 'blocks', 'steals', 'turnovers', 'foulsPersonal', 'q1Points', 'q2Points', 'fieldGoalsAttempted', 'threePointersAttempted', 'freeThrowsAttempted'];
+            const stats = ['assists', 'reboundsTotal', 'blocks', 'steals', 'turnovers', 'foulsPersonal', 'fieldGoalsPercentage', 'freeThrowsAttempted'];
             stats.forEach(s => {
                 const val = gameRow.getAttribute('data-stat-' + s);
                 const slider = document.getElementById('sim_' + s);
@@ -1994,7 +1983,10 @@ def api_predict():
             "home": float(data.get("home", 1)),
         }
         for col in displayCols:
-            row[col] = float(data.get(col, 0))
+            val = float(data.get(col, data.get("fg%", data.get("FG%", 0)) if col == "fieldGoalsPercentage" else 0))
+            if col == "fieldGoalsPercentage" and val > 1.0:
+                val = val / 100.0
+            row[col] = val
         X_input = pd.DataFrame([row])[featCols]
         prob = float(model.predict_proba(X_input)[0][1])
         pred = int(prob >= 0.5)

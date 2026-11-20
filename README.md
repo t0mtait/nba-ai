@@ -23,7 +23,7 @@ dataset, trains the model, and then serves requests.
 |---|---|
 | Dataset | [`eoinamoore/historical-nba-data-and-player-box-scores`](https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores) — `TeamStatistics.csv` (~34 MB), supplemented with recent completed games from the ESPN NBA scoreboard/boxscore API |
 | Model | `StandardScaler` → `LogisticRegression` (sklearn `Pipeline`) |
-| Features | `teamId`, `home`, `assists`, `reboundsTotal`, `blocks`, `steals`, `turnovers`, `foulsPersonal`, `q1Points`, `q2Points`, `fieldGoalsAttempted`, `threePointersAttempted`, `freeThrowsAttempted` |
+| Features | `teamId`, `home`, `assists`, `reboundsTotal`, `blocks`, `steals`, `turnovers`, `foulsPersonal`, `fieldGoalsPercentage`, `freeThrowsAttempted` |
 | Split | 90/10 train/test, `random_state=42` |
 | Refresh | Dataset re-downloaded, supplemented with any newer completed NBA games from ESPN, and model retrained every `REFRESH_INTERVAL_SECONDS` (default `3600`), on a background thread, and lazily on request if the TTL has expired |
 
@@ -48,8 +48,7 @@ Scores a box score. Every display feature is optional and defaults to `0`;
 curl -X POST http://localhost:5000/api/predict \
   -H 'Content-Type: application/json' \
   -d '{"assists":25,"reboundsTotal":44,"blocks":5,"steals":8,"turnovers":13,
-       "foulsPersonal":20,"q1Points":26,"q2Points":26,
-       "fieldGoalsAttempted":87,"threePointersAttempted":33,"freeThrowsAttempted":22}'
+       "foulsPersonal":20,"fieldGoalsPercentage":0.46,"freeThrowsAttempted":22}'
 ```
 
 ```json

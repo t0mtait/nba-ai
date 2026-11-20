@@ -69,23 +69,28 @@ NBA_TEAM_IDS = {
 
 # ── features ─────────────────────────────────────────────────────────────────
 FEAT_COLS = [
-    "home", "assists", "reboundsTotal", "blocks", "steals",
-    "turnovers", "foulsPersonal", "q1Points", "q2Points",
-    "fieldGoalsAttempted", "threePointersAttempted", "freeThrowsAttempted",
+    "teamId", "home", "assists", "reboundsTotal", "blocks", "steals",
+    "turnovers", "foulsPersonal", "fieldGoalsPercentage", "freeThrowsAttempted",
 ]
 
 DISPLAY_COLS = [
     "assists", "reboundsTotal", "blocks", "steals", "turnovers",
-    "foulsPersonal", "q1Points", "q2Points",
-    "fieldGoalsAttempted", "threePointersAttempted", "freeThrowsAttempted",
+    "foulsPersonal", "fieldGoalsPercentage", "freeThrowsAttempted",
 ]
-DISPLAY_LABELS = ["A", "R", "B", "S", "TO", "F", "Q1", "Q2", "FGA", "3FA", "FTA"]
+DISPLAY_LABELS = ["A", "R", "B", "S", "TO", "F", "FG%", "FTA"]
 
 # ── training ─────────────────────────────────────────────────────────────────
 
 def _parse_made_attempted(val: str) -> float:
     parts = str(val).split("-")
     return float(parts[1]) if len(parts) == 2 else float(parts[0])
+
+
+def _parse_pct(val: str) -> float:
+    parts = str(val).split("-")
+    if len(parts) == 2 and float(parts[1]) > 0:
+        return round(float(parts[0]) / float(parts[1]), 3)
+    return 0.0
 
 
 def _append_recent_espn_games(df: pd.DataFrame, date_col: str = "gameDate") -> pd.DataFrame:
@@ -169,19 +174,8 @@ def _append_recent_espn_games(df: pd.DataFrame, date_col: str = "gameDate") -> p
                         continue
 
                     stats = {s["name"]: s["displayValue"] for s in b_home.get("statistics", []) if "name" in s and "displayValue" in s}
-                    linescores = home_c.get("linescores", [])
-                    if len(linescores) < 2:
-                        s_comp = (s_data.get("header", {}).get("competitions") or [{}])[0]
-                        s_home = next((c for c in s_comp.get("competitors", []) if c.get("homeAway") == "home"), {})
-                        linescores = s_home.get("linescores", [])
-                    if len(linescores) < 2:
-                        continue
-
-                    q1 = float(linescores[0].get("displayValue", linescores[0].get("value", 0)))
-                    q2 = float(linescores[1].get("displayValue", linescores[1].get("value", 0)))
-                    fga = _parse_made_attempted(stats["fieldGoalsMade-fieldGoalsAttempted"])
-                    tpa = _parse_made_attempted(stats["threePointFieldGoalsMade-threePointFieldGoalsAttempted"])
-                    fta = _parse_made_attempted(stats["freeThrowsMade-freeThrowsAttempted"])
+                    fg_pct = _parse_pct(stats.get("fieldGoalsMade-fieldGoalsAttempted", ""))
+                    fta = _parse_made_attempted(stats.get("freeThrowsMade-freeThrowsAttempted", "0-0"))
 
                     new_rows.append({
                         date_col: gdate_full,
@@ -192,16 +186,13 @@ def _append_recent_espn_games(df: pd.DataFrame, date_col: str = "gameDate") -> p
                         "opponentTeamName": oname,
                         "home": 1,
                         "win": 1.0 if home_c.get("winner") else 0.0,
-                        "assists": float(stats["assists"]),
-                        "reboundsTotal": float(stats["totalRebounds"]),
-                        "blocks": float(stats["blocks"]),
-                        "steals": float(stats["steals"]),
+                        "assists": float(stats.get("assists", 0)),
+                        "reboundsTotal": float(stats.get("totalRebounds", 0)),
+                        "blocks": float(stats.get("blocks", 0)),
+                        "steals": float(stats.get("steals", 0)),
                         "turnovers": float(stats.get("turnovers", stats.get("totalTurnovers", 0))),
                         "foulsPersonal": float(stats.get("fouls", stats.get("foulsPersonal", 0))),
-                        "q1Points": q1,
-                        "q2Points": q2,
-                        "fieldGoalsAttempted": fga,
-                        "threePointersAttempted": tpa,
+                        "fieldGoalsPercentage": fg_pct,
                         "freeThrowsAttempted": fta,
                     })
                     existing_keys.add((gdate_short, tname, oname))

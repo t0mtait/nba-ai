@@ -1,11 +1,12 @@
 {
-  "trained_at": "2026-08-08 06:00:07",
-  "train_accuracy": 0.7537,
-  "test_accuracy": 0.7484,
-  "total_games": 138694,
-  "train_games": 124824,
-  "test_games": 13870,
+  "trained_at": "2026-11-20 16:15:01",
+  "train_accuracy": 0.6481,
+  "test_accuracy": 0.643,
+  "total_games": 73572,
+  "train_games": 66214,
+  "test_games": 7358,
   "feature_cols": [
+    "teamId",
     "home",
     "assists",
     "reboundsTotal",
@@ -13,10 +14,7 @@
     "steals",
     "turnovers",
     "foulsPersonal",
-    "q1Points",
-    "q2Points",
-    "fieldGoalsAttempted",
-    "threePointersAttempted",
+    "fieldGoalsPercentage",
     "freeThrowsAttempted"
   ],
   "display_cols": [
@@ -26,10 +24,7 @@
     "steals",
     "turnovers",
     "foulsPersonal",
-    "q1Points",
-    "q2Points",
-    "fieldGoalsAttempted",
-    "threePointersAttempted",
+    "fieldGoalsPercentage",
     "freeThrowsAttempted"
   ],
   "display_labels": [
@@ -39,10 +34,7 @@
     "S",
     "TO",
     "F",
-    "Q1",
-    "Q2",
-    "FGA",
-    "3FA",
+    "FG%",
     "FTA"
   ],
   "model_class": "LogisticRegression"
