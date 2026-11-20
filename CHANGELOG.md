@@ -1,3 +1,10 @@
+# [2.4.0](https://github.com/t0mtait/nba-ai/compare/v2.3.0...v2.4.0) (2026-11-20)
+
+
+### Features
+
+* replace q1/q2 points, fga, and 3fa with fg% in model and win simulator ([3799453](https://github.com/t0mtait/nba-ai/commit/3799453ddeb53ebaee0fcc419b7db36201f6103d))
+
 # [2.3.0](https://github.com/t0mtait/nba-ai/compare/v2.2.1...v2.3.0) (2026-11-17)
 
 
